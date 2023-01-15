@@ -1,7 +1,7 @@
-mod fo_visualzer;
+mod fo_visualizer;
 
 fn main() {
-    fo_visualzer::render_plot();
+    fo_visualizer::render_plot();
 }
 
 //main code can go here and each implementation of visualizers (something that creates a pdf or a page)
