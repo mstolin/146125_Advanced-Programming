@@ -3,6 +3,17 @@
 version = 3
 
 [[package]]
+name = "SGX"
+version = "0.1.3"
+source = "registry+git://advancedprogramming.disi.unitn.it/index"
+checksum = "b66ff55898e4f6ae29b6770485f59c05df078f70101aee18193c9865c9d2c3ee"
+dependencies = [
+ "chrono",
+ "rand",
+ "unitn_market_2022",
+]
+
+[[package]]
 name = "TASE"
 version = "0.1.2"
 source = "registry+git://advancedprogramming.disi.unitn.it/index"
@@ -227,6 +238,7 @@ dependencies = [
 name = "cli"
 version = "0.1.0"
 dependencies = [
+ "SGX",
  "TASE",
  "ZSE",
  "clap",
