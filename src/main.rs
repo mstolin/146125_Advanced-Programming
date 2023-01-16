@@ -1,7 +1,9 @@
 mod fo_visualizer;
 
 fn main() {
-    fo_visualizer::render_plot();
+    if let Err(e) = fo_visualizer::render_plot(){
+        println!("{}",e);
+    }
 }
 
 //main code can go here and each implementation of visualizers (something that creates a pdf or a page)
