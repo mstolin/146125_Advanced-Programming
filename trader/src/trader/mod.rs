@@ -1,10 +1,10 @@
-use std::borrow::{Borrow, BorrowMut};
 use crate::strategy::strategy::{Strategy, StrategyResult};
 use crate::MarketRef;
-use unitn_market_2022::market::Market;
+use std::borrow::{Borrow, BorrowMut};
 use unitn_market_2022::good::consts::DEFAULT_GOOD_KIND;
 use unitn_market_2022::good::good::Good;
 use unitn_market_2022::good::good_kind::GoodKind;
+use unitn_market_2022::market::Market;
 use unitn_market_2022::{subscribe_each_other, wait_one_day};
 
 enum StrategyIdentifier {
@@ -55,7 +55,9 @@ impl Trader {
 impl Trader {
     fn increase_day_by_one(&mut self) {
         self.days += 1;
-        self.markets.iter_mut().for_each(|m| wait_one_day!(m.as_ref()));
+        self.markets
+            .iter_mut()
+            .for_each(|m| wait_one_day!(m.as_ref()));
     }
 
     /**
@@ -94,15 +96,15 @@ impl Trader {
 
 #[cfg(test)]
 mod tests {
-    use unitn_market_2022::market::Market;
-    use SGX::market::sgx::SGX;
+    use crate::trader::{StrategyIdentifier, Trader};
+    use crate::MarketRef;
     use smse::Smse;
-    use TASE::TASE;
     use unitn_market_2022::good::good::Good;
     use unitn_market_2022::good::good_kind::GoodKind;
+    use unitn_market_2022::market::Market;
+    use SGX::market::sgx::SGX;
+    use TASE::TASE;
     use ZSE::market::ZSE;
-    use crate::MarketRef;
-    use crate::trader::{StrategyIdentifier, Trader};
 
     fn init_markets() -> (MarketRef, MarketRef, MarketRef, MarketRef) {
         let sgx = SGX::new_random();
@@ -115,7 +117,14 @@ mod tests {
     #[test]
     fn test_new_trader() {
         let (sgx, smse, tase, zse) = init_markets();
-        let trader = Trader::new(StrategyIdentifier::Most_Simple, 300_000.0, sgx, smse, tase, zse);
+        let trader = Trader::new(
+            StrategyIdentifier::Most_Simple,
+            300_000.0,
+            sgx,
+            smse,
+            tase,
+            zse,
+        );
         assert_eq!(4, trader.markets.len());
         assert_eq!(4, trader.goods.len());
     }
@@ -135,5 +144,4 @@ mod tests {
         let yen = Good::new(GoodKind::YEN, 0.0);
         assert_eq!(true, goods.contains(&yen), "{:?} not found in goods", yen);
     }
-
 }
