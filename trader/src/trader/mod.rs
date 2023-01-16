@@ -12,10 +12,13 @@ enum StrategyIdentifier {
     Most_Simple,
 }
 
+pub type TraderResult = Vec<Vec<Good>>;
+
 struct Trader {
     markets: Vec<MarketRef>,
     strategy: Box<dyn Strategy>,
     goods: Vec<Good>,
+    result: TraderResult, // todo call history
     days: u32,
 }
 
@@ -51,10 +54,15 @@ impl Trader {
         // All markets must subscribe to each other
         subscribe_each_other!(sgx, smse, tase, zse);
 
+        // init default goods
+        let goods = Self::create_goods(start_capital);
+        let result = Vec::from([goods.clone()]);
+
         Self {
             markets: Vec::from([sgx, smse, tase, zse]),
             strategy: Self::init_strategy(strategyId),
-            goods: Self::create_goods(start_capital),
+            goods,
+            result,
             days: 0,
         }
     }
@@ -80,25 +88,30 @@ impl Trader {
             )
         }
 
+        // todo instead of using modulo, calculate how much to apply the trader and then count from zero
         let mut past_minutes: u32 = 0;
         while past_minutes < minutes_per_day {
             if past_minutes % apply_every_minutes == 0 {
                 // Apply strategy every n minutes
-                //self.strategy.apply(&mut self.markets, &mut self.goods); // todo: Maybe internal mutability pattern here
+                self.strategy.apply(&mut self.markets, &mut self.goods); // todo: Maybe internal mutability pattern here
             }
             past_minutes += 1;
         }
 
+        // add updated goods
+        self.result.push(self.goods.clone());
+        // lastly increase day
         self.increase_day_by_one();
     }
 
+    /// Returns the number of days the agent is running
     pub fn get_days(&self) -> u32 {
         self.days
     }
 
-    pub fn get_result(&self) -> StrategyResult {
-        //self.strategy.get_result()
-        todo!()
+    /// Returns the result of the trader
+    pub fn get_result(&self) -> TraderResult {
+        self.result.clone()
     }
 }
 
@@ -114,7 +127,7 @@ mod tests {
     use TASE::TASE;
     use ZSE::market::ZSE;
 
-    fn init_markets() -> (MarketRef, MarketRef, MarketRef, MarketRef) {
+    fn init_random_markets() -> (MarketRef, MarketRef, MarketRef, MarketRef) {
         let sgx = SGX::new_random();
         let smse = Smse::new_random();
         let tase = TASE::new_random();
@@ -124,7 +137,7 @@ mod tests {
 
     #[test]
     fn test_new_trader() {
-        let (sgx, smse, tase, zse) = init_markets();
+        let (sgx, smse, tase, zse) = init_random_markets();
         let trader = Trader::new(
             StrategyIdentifier::Most_Simple,
             300_000.0,
