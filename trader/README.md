@@ -16,7 +16,7 @@ let trader = Trader::from(
 );
 
 while trader.get_days() < 24 { // run trader for 24 days (starts at 0)
-    trader.run();
+    trader.apply_strategy(30); // apply its strategy every 30 min
 }
 
 let history = trader.get_history();
