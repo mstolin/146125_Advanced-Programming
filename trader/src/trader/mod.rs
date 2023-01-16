@@ -1,6 +1,7 @@
 use unitn_market_2022::good::consts::DEFAULT_GOOD_KIND;
 use unitn_market_2022::good::good::Good;
 use unitn_market_2022::good::good_kind::GoodKind;
+use unitn_market_2022::wait_one_day;
 use crate::strategy::strategy::{Strategy, StrategyResult};
 use crate::MarketRef;
 
@@ -27,8 +28,6 @@ impl Trader {
             panic!("start_capital must be greater than 0.0")
         }
 
-        // todo: Make all markets subscribe from each other
-
         Self {
             markets,
             strategy,
@@ -39,6 +38,11 @@ impl Trader {
 }
 
 impl Trader {
+    fn increase_day_by_one(&mut self) {
+        self.days+=1;
+        self.markets.iter().for_each(|m| wait_one_day!(m));
+    }
+
     /**
      * Applies the strategy every *n* minutes until the day is over.
      */
@@ -60,8 +64,7 @@ impl Trader {
             past_minutes += 1;
         }
 
-        self.days += 1;
-        // todo: Increase markets days
+        self.increase_day_by_one();
     }
 
     pub fn get_days(&self) -> u32 {
