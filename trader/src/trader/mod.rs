@@ -167,5 +167,4 @@ mod tests {
         let most_simple = Trader::init_strategy(StrategyIdentifier::Most_Simple);
         assert_eq!()
     }*/
-
 }
