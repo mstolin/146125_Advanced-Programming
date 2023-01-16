@@ -88,20 +88,16 @@ impl Trader {
             )
         }
 
-        // todo instead of using modulo, calculate how much to apply the trader and then count from zero
-        let mut past_minutes: u32 = 0;
-        while past_minutes < minutes_per_day {
-            if past_minutes % apply_every_minutes == 0 {
-                // Apply strategy every n minutes
-                self.strategy.apply(&mut self.markets, &mut self.goods); // todo: Maybe internal mutability pattern here
-            }
-            past_minutes += 1;
+        // how many times to apply the strategy per day
+        let interval_times = minutes_per_day / apply_every_minutes;
+        for _ in 0..interval_times {
+            self.strategy.apply(&mut self.markets, &mut self.goods); // todo: Maybe internal mutability pattern here
         }
 
-        // add updated goods
-        self.history.push(self.goods.clone());
         // lastly increase day
         self.increase_day_by_one();
+        // add updated goods
+        self.history.push(self.goods.clone());
     }
 
     /// Returns the number of days the agent is running
@@ -171,4 +167,5 @@ mod tests {
         let most_simple = Trader::init_strategy(StrategyIdentifier::Most_Simple);
         assert_eq!()
     }*/
+
 }
