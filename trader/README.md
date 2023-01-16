@@ -1,6 +1,6 @@
 # Trader
 
-This is a library containing all the code of running a trader
+This is the library containing all the code of running a trader
 agent on certain markets.
 
 ## Usage
@@ -9,16 +9,17 @@ agent on certain markets.
 let mut sgx = SGX::new_random();
 let markets = Vec::from([sgx]);
 
-let trader = Trader::new(
-    StrategyIdentifier::BuyAndHold, 
+let trader = Trader::from(
+    StrategyIdentifier::BuyAndHold,
+    300_000.0, // starting capital in EUR
     markets
 );
 
-while trader.get_days() < 24 {
+while trader.get_days() < 24 { // run trader for 24 days (starts at 0)
     trader.run();
 }
 
-let result = trader.get_result();
+let history = trader.get_history();
 ```
 
 ### Result
@@ -35,8 +36,9 @@ For example:
 
 ```rust
 [
-    [300000, 0, 0, 0], // Day 0 (EUR, USD, YEN, YUAN)
-    [250000, 220200, 5000, 450, 15000], // After day 1
+  //  EUR  |  USD  |  YEN  |  YUAN 
+    [300000,      0,      0,      0], // Initially at day 0
+    [250000, 220200,   5000,    450], // After day 1
     ... // until the last day
 ]
 ```
