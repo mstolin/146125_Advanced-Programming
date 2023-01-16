@@ -1,3 +1,4 @@
+use crate::strategy::most_simple_strategy::MostSimpleStrategy;
 use crate::strategy::strategy::{Strategy, StrategyResult};
 use crate::MarketRef;
 use std::borrow::{Borrow, BorrowMut};
@@ -13,7 +14,7 @@ enum StrategyIdentifier {
 
 struct Trader {
     markets: Vec<MarketRef>,
-    //strategy: Box<dyn Strategy>,
+    strategy: Box<dyn Strategy>,
     goods: Vec<Good>,
     days: u32,
 }
@@ -28,9 +29,15 @@ impl Trader {
         Vec::from([eur, usd, yen, yuan])
     }
 
+    fn init_strategy(id: StrategyIdentifier) -> Box<dyn Strategy> {
+        match id {
+            StrategyIdentifier::Most_Simple => Box::new(MostSimpleStrategy::new()),
+        }
+    }
+
     /// Instantiates a trader
     pub fn new(
-        strategy: StrategyIdentifier,
+        strategyId: StrategyIdentifier,
         start_capital: f32,
         sgx: MarketRef,
         smse: MarketRef,
@@ -46,6 +53,7 @@ impl Trader {
 
         Self {
             markets: Vec::from([sgx, smse, tase, zse]),
+            strategy: Self::init_strategy(strategyId),
             goods: Self::create_goods(start_capital),
             days: 0,
         }
@@ -144,4 +152,10 @@ mod tests {
         let yen = Good::new(GoodKind::YEN, 0.0);
         assert_eq!(true, goods.contains(&yen), "{:?} not found in goods", yen);
     }
+
+    /*#[test]
+    fn test_init_strategy() {
+        let most_simple = Trader::init_strategy(StrategyIdentifier::Most_Simple);
+        assert_eq!()
+    }*/
 }
