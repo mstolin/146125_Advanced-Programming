@@ -1,5 +1,5 @@
 use crate::strategy::most_simple_strategy::MostSimpleStrategy;
-use crate::strategy::strategy::{Strategy, StrategyResult};
+use crate::strategy::strategy::Strategy;
 use crate::MarketRef;
 use std::borrow::{Borrow, BorrowMut};
 use unitn_market_2022::good::consts::DEFAULT_GOOD_KIND;
@@ -12,13 +12,13 @@ enum StrategyIdentifier {
     Most_Simple,
 }
 
-pub type TraderResult = Vec<Vec<Good>>;
+pub type TraderHistory = Vec<Vec<Good>>;
 
 struct Trader {
     markets: Vec<MarketRef>,
     strategy: Box<dyn Strategy>,
     goods: Vec<Good>,
-    result: TraderResult, // todo call history
+    history: TraderHistory,
     days: u32,
 }
 
@@ -56,13 +56,13 @@ impl Trader {
 
         // init default goods
         let goods = Self::create_goods(start_capital);
-        let result = Vec::from([goods.clone()]);
+        let history = Vec::from([goods.clone()]);
 
         Self {
             markets: Vec::from([sgx, smse, tase, zse]),
             strategy: Self::init_strategy(strategyId),
             goods,
-            result,
+            history,
             days: 0,
         }
     }
@@ -99,7 +99,7 @@ impl Trader {
         }
 
         // add updated goods
-        self.result.push(self.goods.clone());
+        self.history.push(self.goods.clone());
         // lastly increase day
         self.increase_day_by_one();
     }
@@ -109,9 +109,9 @@ impl Trader {
         self.days
     }
 
-    /// Returns the result of the trader
-    pub fn get_result(&self) -> TraderResult {
-        self.result.clone()
+    /// Returns the history of the trader
+    pub fn get_history(&self) -> TraderHistory {
+        self.history.clone()
     }
 }
 
