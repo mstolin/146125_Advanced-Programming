@@ -39,7 +39,7 @@ impl Trader {
     }
 
     /// Instantiates a trader
-    pub fn new(
+    pub fn from(
         strategyId: StrategyIdentifier,
         start_capital: f32,
         sgx: MarketRef,
@@ -134,7 +134,7 @@ mod tests {
     #[test]
     fn test_new_trader() {
         let (sgx, smse, tase, zse) = init_random_markets();
-        let trader = Trader::new(
+        let trader = Trader::from(
             StrategyIdentifier::Most_Simple,
             300_000.0,
             sgx,
