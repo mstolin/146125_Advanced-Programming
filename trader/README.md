@@ -22,7 +22,7 @@ while trader.get_days() < 24 { // run trader for 24 days (starts at 0)
 let history = trader.get_history();
 ```
 
-### Result
+### History
 
 The result of the trader is a vector representing the history
 of its buying and selling actions. There exist 4 different
