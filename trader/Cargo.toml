@@ -5,6 +5,7 @@ edition = "2021"
 authors = ["Farid Ouedraogo, Marcel Stolin, Sebastiano Cassol, Jacopo Clocchiatti"]
 
 [dependencies]
+rand = "0.8.5"
 unitn_market_2022 = { version = "1.0.10", registry = "kellnr" }
 
 [dev-dependencies]
