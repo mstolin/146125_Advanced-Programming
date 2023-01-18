@@ -1,3 +1,4 @@
+use std::borrow::BorrowMut;
 use crate::strategy::strategy::Strategy;
 use crate::MarketRef;
 use rand::seq::SliceRandom;
@@ -9,7 +10,7 @@ use unitn_market_2022::market::good_label::GoodLabel;
 type BuyHistory = (f32, Good); // (eur buy price, bought good with bought quantuty)
 
 pub struct MostSimpleStrategy {
-    bought_goods: Vec<BuyHistory>,
+    buy_history: Vec<BuyHistory>,
 }
 
 impl MostSimpleStrategy {
@@ -46,7 +47,8 @@ impl MostSimpleStrategy {
     fn get_highest_selling_market<'a>(
         &'a self,
         markets: &'a Vec<MarketRef>,
-        history: BuyHistory,
+        good: &'a Good,
+        bought_price: f32
     ) -> Option<(&MarketRef, f32)> {
         markets
             .iter()
@@ -54,7 +56,7 @@ impl MostSimpleStrategy {
                 if let Ok(sell_price) = m
                     .as_ref()
                     .borrow()
-                    .get_sell_price(history.1.get_kind(), history.1.get_qty())
+                    .get_sell_price(good.get_kind(), good.get_qty())
                 {
                     Some((m, sell_price))
                 } else {
@@ -63,7 +65,7 @@ impl MostSimpleStrategy {
             })
             .filter(|r| r.is_some())
             .map(|r| r.unwrap())
-            .filter(|(_, sell_price)| *sell_price > history.0)
+            .filter(|(_, sell_price)| *sell_price > bought_price)
             .reduce(|(market_a, price_a), (market_b, price_b)| {
                 if price_a > price_b {
                     (market_a, price_a)
@@ -72,23 +74,46 @@ impl MostSimpleStrategy {
                 }
             })
     }
+
+    fn increase_eur_qty(&self, goods: &mut Vec<Good>, merge_eur: Good) {
+        let eur = goods.iter_mut().find(|g| g.get_kind() == DEFAULT_GOOD_KIND);
+        if let Some(eur) = eur {
+            let _ = eur.merge(merge_eur);
+        }
+    }
+
+    fn sell_if_needed(&mut self, markets: &mut Vec<MarketRef>, goods: &mut Vec<Good>, trader_name: &String) {
+        if !self.buy_history.is_empty() {
+            // there are still goods to sell
+            for (bought_price, bought_good) in &self.buy_history {
+                if let Some((market, offer)) = self.get_highest_selling_market(markets, bought_good, *bought_price) {
+                    let mut market = market.as_ref().borrow_mut();
+                    if let Ok(token) = market.lock_sell(bought_good.get_kind(), bought_good.get_qty(), offer, trader_name.clone()) {
+                        let mut good_clone = bought_good.clone();
+                        if let Ok(eur) = market.sell(token, &mut good_clone) {
+                            // sell was successful, need to update our eur quantity
+                            self.increase_eur_qty(goods, eur);
+                        }
+                    }
+                } else {
+                    // no highest selling market found
+                    println!("No adequate market was found for bought good {}{} for bought price {}EUR", bought_good.get_qty(), bought_good.get_kind(), bought_price);
+                }
+            }
+        }
+    }
 }
 
 impl Strategy for MostSimpleStrategy {
     fn new() -> Self {
         Self {
-            bought_goods: Vec::new(),
+            buy_history: Vec::new(),
         }
     }
 
-    fn apply(&mut self, markets: &mut Vec<MarketRef>, goods: &mut Vec<Good>) {
+    fn apply(&mut self, markets: &mut Vec<MarketRef>, goods: &mut Vec<Good>, trader_name: &String) {
         // ## SELL
-        if !self.bought_goods.is_empty() {
-            // there are still goods to sell
-            /*for history in self.bought_goods {
-                if let Some(market)
-            }*/
-        }
+        self.sell_if_needed(markets, goods, trader_name);
 
         // ## BUY
 
@@ -110,6 +135,7 @@ mod tests {
     use unitn_market_2022::good::good_kind::GoodKind;
     use unitn_market_2022::market::Market;
     use TASE::TASE;
+    use unitn_market_2022::good::consts::DEFAULT_GOOD_KIND;
     use ZSE::market::ZSE;
 
     #[test]
@@ -145,10 +171,10 @@ mod tests {
 
         // Check with
         let strategy = MostSimpleStrategy::new();
-        let our_price = 0.0; // doesnt matter, but lets assume we paid nothing, so every price is higher
-        let history: BuyHistory = (our_price, Good::new(GoodKind::USD, quantity));
+        let bought_price = 0.0; // doesnt matter, but lets assume we paid nothing, so every price is higher
+        let bought_good = Good::new(GoodKind::USD, quantity);
         let (highest_selling_market, highest_market_price) = strategy
-            .get_highest_selling_market(&markets, history)
+            .get_highest_selling_market(&markets, &bought_good, bought_price)
             .unwrap();
         println!(
             "HIGHEST SELLING MARKET IS {} WITH {}",
@@ -235,5 +261,26 @@ mod tests {
             "Adequate price must be equal or lower than {}",
             eur_quantity
         );
+    }
+
+    #[test]
+    fn test_sell_if_needed() {
+        let market = ZSE::new_with_quantities(500_000.0, 500_000.0, 500_000.0, 500_000.0);
+        let usd_sell_price = market.borrow().get_sell_price(GoodKind::USD, 20_000.0).unwrap();
+        let mut markets = Vec::from([market]);
+
+        let mut our_goods = Vec::from([
+            Good::new(GoodKind::EUR, 0.0),
+            Good::new(GoodKind::USD, 0.0),
+            Good::new(GoodKind::YEN, 0.0),
+            Good::new(GoodKind::YUAN, 0.0),
+        ]);
+        let mut strategy = MostSimpleStrategy {
+            buy_history: Vec::from([(usd_sell_price - 1.0, Good::new(GoodKind::USD, 20_000.0))]),
+        };
+        strategy.sell_if_needed(&mut markets, &mut our_goods, &"TEST_TRADER".to_string());
+
+        let new_eur = our_goods.iter().find(|g| g.get_kind() == DEFAULT_GOOD_KIND).unwrap();
+        assert_eq!(usd_sell_price, new_eur.get_qty(), "After selling EUR has to be {}", usd_sell_price);
     }
 }
