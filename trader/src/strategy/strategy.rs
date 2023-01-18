@@ -6,5 +6,5 @@ pub trait Strategy {
     fn new() -> Self
     where
         Self: Sized;
-    fn apply(&mut self, markets: &mut Vec<MarketRef>, goods: &mut Vec<Good>);
+    fn apply(&mut self, markets: &mut Vec<MarketRef>, goods: &mut Vec<Good>, trader_name: &String);
 }

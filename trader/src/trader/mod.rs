@@ -15,6 +15,7 @@ enum StrategyIdentifier {
 pub type TraderHistory = Vec<Vec<Good>>;
 
 struct Trader {
+    name: String,
     markets: Vec<MarketRef>,
     strategy: Box<dyn Strategy>,
     goods: Vec<Good>,
@@ -40,6 +41,7 @@ impl Trader {
 
     /// Instantiates a trader
     pub fn from(
+        name: String,
         strategyId: StrategyIdentifier,
         start_capital: f32,
         sgx: MarketRef,
@@ -59,6 +61,7 @@ impl Trader {
         let history = Vec::from([goods.clone()]);
 
         Self {
+            name,
             markets: Vec::from([sgx, smse, tase, zse]),
             strategy: Self::init_strategy(strategyId),
             goods,
@@ -88,15 +91,15 @@ impl Trader {
             )
         }
 
-        // how many times to apply the strategy per day
+        // how many times to apply the strategy per day?
         let interval_times = minutes_per_day / apply_every_minutes;
         for _ in 0..interval_times {
-            self.strategy.apply(&mut self.markets, &mut self.goods); // todo: Maybe internal mutability pattern here
+            self.strategy.apply(&mut self.markets, &mut self.goods, &self.name); // todo: Maybe internal mutability pattern here
         }
 
         // lastly increase day
         self.increase_day_by_one();
-        // add updated goods
+        // add updated goods after one day to the history
         self.history.push(self.goods.clone());
     }
 
@@ -135,6 +138,7 @@ mod tests {
     fn test_new_trader() {
         let (sgx, smse, tase, zse) = init_random_markets();
         let trader = Trader::from(
+            "TEST_TRADER".to_string(),
             StrategyIdentifier::Most_Simple,
             300_000.0,
             sgx,
