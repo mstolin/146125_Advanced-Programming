@@ -94,7 +94,8 @@ impl Trader {
         // how many times to apply the strategy per day?
         let interval_times = minutes_per_day / apply_every_minutes;
         for _ in 0..interval_times {
-            self.strategy.apply(&mut self.markets, &mut self.goods, &self.name); // todo: Maybe internal mutability pattern here
+            self.strategy
+                .apply(&mut self.markets, &mut self.goods, &self.name); // todo: Maybe internal mutability pattern here
         }
 
         // lastly increase day

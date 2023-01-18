@@ -1,7 +1,7 @@
-use std::borrow::BorrowMut;
 use crate::strategy::strategy::Strategy;
 use crate::MarketRef;
 use rand::seq::SliceRandom;
+use std::borrow::BorrowMut;
 use unitn_market_2022::good::consts::DEFAULT_GOOD_KIND;
 use unitn_market_2022::good::good::Good;
 use unitn_market_2022::good::good_kind::GoodKind;
@@ -48,7 +48,7 @@ impl MostSimpleStrategy {
         &'a self,
         markets: &'a Vec<MarketRef>,
         good: &'a Good,
-        bought_price: f32
+        bought_price: f32,
     ) -> Option<(&MarketRef, f32)> {
         markets
             .iter()
@@ -82,13 +82,25 @@ impl MostSimpleStrategy {
         }
     }
 
-    fn sell_if_needed(&mut self, markets: &mut Vec<MarketRef>, goods: &mut Vec<Good>, trader_name: &String) {
+    fn sell_if_needed(
+        &mut self,
+        markets: &mut Vec<MarketRef>,
+        goods: &mut Vec<Good>,
+        trader_name: &String,
+    ) {
         if !self.buy_history.is_empty() {
             // there are still goods to sell
             for (bought_price, bought_good) in &self.buy_history {
-                if let Some((market, offer)) = self.get_highest_selling_market(markets, bought_good, *bought_price) {
+                if let Some((market, offer)) =
+                    self.get_highest_selling_market(markets, bought_good, *bought_price)
+                {
                     let mut market = market.as_ref().borrow_mut();
-                    if let Ok(token) = market.lock_sell(bought_good.get_kind(), bought_good.get_qty(), offer, trader_name.clone()) {
+                    if let Ok(token) = market.lock_sell(
+                        bought_good.get_kind(),
+                        bought_good.get_qty(),
+                        offer,
+                        trader_name.clone(),
+                    ) {
                         let mut good_clone = bought_good.clone();
                         if let Ok(eur) = market.sell(token, &mut good_clone) {
                             // sell was successful, need to update our eur quantity
@@ -97,7 +109,12 @@ impl MostSimpleStrategy {
                     }
                 } else {
                     // no highest selling market found
-                    println!("No adequate market was found for bought good {}{} for bought price {}EUR", bought_good.get_qty(), bought_good.get_kind(), bought_price);
+                    println!(
+                        "No adequate market was found for bought good {}{} for bought price {}EUR",
+                        bought_good.get_qty(),
+                        bought_good.get_kind(),
+                        bought_price
+                    );
                 }
             }
         }
@@ -131,11 +148,11 @@ mod tests {
     use crate::strategy::most_simple_strategy::{BuyHistory, MostSimpleStrategy};
     use crate::strategy::strategy::Strategy;
     use smse::Smse;
+    use unitn_market_2022::good::consts::DEFAULT_GOOD_KIND;
     use unitn_market_2022::good::good::Good;
     use unitn_market_2022::good::good_kind::GoodKind;
     use unitn_market_2022::market::Market;
     use TASE::TASE;
-    use unitn_market_2022::good::consts::DEFAULT_GOOD_KIND;
     use ZSE::market::ZSE;
 
     #[test]
@@ -266,7 +283,10 @@ mod tests {
     #[test]
     fn test_sell_if_needed() {
         let market = ZSE::new_with_quantities(500_000.0, 500_000.0, 500_000.0, 500_000.0);
-        let usd_sell_price = market.borrow().get_sell_price(GoodKind::USD, 20_000.0).unwrap();
+        let usd_sell_price = market
+            .borrow()
+            .get_sell_price(GoodKind::USD, 20_000.0)
+            .unwrap();
         let mut markets = Vec::from([market]);
 
         let mut our_goods = Vec::from([
@@ -280,7 +300,15 @@ mod tests {
         };
         strategy.sell_if_needed(&mut markets, &mut our_goods, &"TEST_TRADER".to_string());
 
-        let new_eur = our_goods.iter().find(|g| g.get_kind() == DEFAULT_GOOD_KIND).unwrap();
-        assert_eq!(usd_sell_price, new_eur.get_qty(), "After selling EUR has to be {}", usd_sell_price);
+        let new_eur = our_goods
+            .iter()
+            .find(|g| g.get_kind() == DEFAULT_GOOD_KIND)
+            .unwrap();
+        assert_eq!(
+            usd_sell_price,
+            new_eur.get_qty(),
+            "After selling EUR has to be {}",
+            usd_sell_price
+        );
     }
 }
