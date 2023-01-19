@@ -17,24 +17,33 @@ pub struct MostSimpleStrategy {
 }
 
 impl MostSimpleStrategy {
-    /// Return an adequate quantity to buy
-    fn find_adequate_good_to_buy(
+    /// Returns an adequate bid for the given EUR quantity.
+    /// This method tries to get the maximum quantity of the good for the given label,
+    /// that this strategy can buy with the given amount of EUR.
+    /// It is possible that the given EUR is too low and no quantity will be found.
+    ///
+    /// The return value is (buy price in EUR, quantity of good).
+    fn find_adequate_bid(
         &self,
         label: &GoodLabel,
         market: &Ref<dyn Market>,
         max_eur: f32,
-    ) -> Option<(f32, Good)> {
+    ) -> Option<(f32, f32)> {
+        if label.good_kind == DEFAULT_GOOD_KIND {
+            // Its not smart to buy eur for eur
+            return None;
+        }
+
         let mut tried_qty = label.quantity; // start with max available quantity
         let max_tries = (tried_qty / 2.0) as u32; // todo: There has to be a better solution
         let mut tries = 0;
 
         while tries < max_tries {
             // get cheapest price for current quantity
-            //if let Some(cheapest_price) = self.get_cheapest_buy_price(&label.good_kind, tried_qty, market) {
             if let Ok(buy_price) = market.get_buy_price(label.good_kind, tried_qty) {
                 // is the price lower or equal to our maximum
                 if buy_price <= max_eur {
-                    return Some((buy_price, Good::new(label.good_kind, tried_qty)));
+                    return Some((buy_price, tried_qty));
                 }
             }
 
@@ -65,9 +74,12 @@ impl MostSimpleStrategy {
             .get_goods()
             .iter()
             .filter(|l| l.good_kind != DEFAULT_GOOD_KIND)
-            .map(|label| self.find_adequate_good_to_buy(label, market, eur_qty))
-            .filter(|res| res.is_some())
-            .map(|res| res.unwrap())
+            .map(|label| (label, self.find_adequate_bid(label, market, eur_qty)))
+            .filter(|(_, res)| res.is_some())
+            .map(|(label, res)| {
+                let (price, qty) = res.unwrap();
+                (price, Good::new(label.good_kind, qty))
+            })
             .reduce(|(price_a, good_a), (price_b, good_b)| {
                 if good_a.get_qty() > good_b.get_qty() {
                     (price_a, good_a)
@@ -441,7 +453,7 @@ mod tests {
     }
 
     #[test]
-    fn test_find_adequate_good_to_buy() {
+    fn test_find_adequate_bid() {
         let quantity: f32 = 1_000.0;
         let market = ZSE::new_with_quantities(quantity, quantity, quantity, quantity);
 
@@ -455,8 +467,9 @@ mod tests {
         let mut iter = goods.iter().filter(|l| l.good_kind != DEFAULT_GOOD_KIND);
         let high_eur = 1_000_000.0; // test with very high bid
         while let Some(label) = iter.next() {
-            let (qty, good) = strategy.find_adequate_good_to_buy(label, &market, high_eur).unwrap();
-            assert!(qty <= high_eur, "Adequate buy price can't be higher than {}", high_eur);
+            let (price, qty) = strategy.find_adequate_bid(label, &market, high_eur).unwrap();
+            assert!(price <= high_eur, "Adequate buy price can't be higher than {}", high_eur);
+            assert!(qty > 0.0, "Quantity ({}) of adequate bid can't be less or equal to 0", qty);
         }
     }
 }
