@@ -14,16 +14,16 @@ enum StrategyIdentifier {
 
 pub type TraderHistory = Vec<Vec<Good>>;
 
-struct Trader {
+struct Trader<'a> {
     name: String,
-    markets: Vec<MarketRef>,
+    markets: Vec<&'a MarketRef>,
     strategy: Box<dyn Strategy>,
     goods: Vec<Good>,
     history: TraderHistory,
     days: u32,
 }
 
-impl Trader {
+impl<'a> Trader<'a> {
     /// Creates a vec with all available goods
     fn create_goods(default_quantity: f32) -> Vec<Good> {
         let eur = Good::new(GoodKind::EUR, default_quantity);
@@ -44,17 +44,17 @@ impl Trader {
         name: String,
         strategyId: StrategyIdentifier,
         start_capital: f32,
-        sgx: MarketRef,
-        smse: MarketRef,
-        tase: MarketRef,
-        zse: MarketRef,
+        sgx: &'a MarketRef,
+        smse: &'a MarketRef,
+        tase: &'a MarketRef,
+        zse: &'a MarketRef,
     ) -> Self {
         if start_capital <= 0.0 {
             panic!("start_capital must be greater than 0.0")
         }
 
         // All markets must subscribe to each other
-        subscribe_each_other!(sgx, smse, tase, zse);
+        subscribe_each_other!(*sgx, *smse, *tase, *zse);
 
         // init default goods
         let goods = Self::create_goods(start_capital);
@@ -71,7 +71,7 @@ impl Trader {
     }
 }
 
-impl Trader {
+impl<'a> Trader<'a> {
     fn increase_day_by_one(&mut self) {
         self.days += 1;
         self.markets
@@ -142,10 +142,10 @@ mod tests {
             "TEST_TRADER".to_string(),
             StrategyIdentifier::Most_Simple,
             300_000.0,
-            sgx,
-            smse,
-            tase,
-            zse,
+            &sgx,
+            &smse,
+            &tase,
+            &zse,
         );
         assert_eq!(4, trader.markets.len());
         assert_eq!(4, trader.goods.len());
