@@ -13,7 +13,7 @@ type BuyHistory = (f32, Good); // (eur buy price, bought good with bought quanti
 
 pub struct MostSimpleStrategy {
     buy_tokens: Vec<(&'static str, f32, String)>, // (market name, bid, token) todo: Custom type
-    buy_history: Vec<BuyHistory>, // TODO REMOVE ME
+    buy_history: Vec<BuyHistory>,                 // TODO REMOVE ME
 }
 
 impl MostSimpleStrategy {
@@ -51,12 +51,18 @@ impl MostSimpleStrategy {
             let s = tried_qty / 2.0; // to go below zero, this has to be higher than the half
             tried_qty = tried_qty - s; // todo check for a more fine grained solution
 
-            tries+=1;
+            tries += 1;
         }
         None
     }
 
-    fn lock_buy(&mut self, good: Good, bid: f32, trader_name: &String, mut market: RefMut<dyn Market>) {
+    fn lock_buy(
+        &mut self,
+        good: Good,
+        bid: f32,
+        trader_name: &String,
+        mut market: RefMut<dyn Market>,
+    ) {
         if let Ok(token) =
             market.lock_buy(good.get_kind(), good.get_qty(), bid, trader_name.clone())
         {
@@ -65,7 +71,14 @@ impl MostSimpleStrategy {
         }
     }
 
-    fn find_cheapest_good_from_market(
+    /// This method tries to return the cheapest possible good from the given market.
+    /// It still limits to find an adequate bid (eur price and godo quantity) for the given
+    /// EUR quantity. To find an adequate bid for quantity, it uses [`find_adequate_bid()`].
+    ///
+    /// It may be possible that no good is buyable for the given EURs.
+    ///
+    /// The return value is (bid in EUR, the Good).
+    fn find_cheapest_good_to_buy_from_market(
         &self,
         market: &Ref<dyn Market>,
         eur_qty: f32,
@@ -89,7 +102,11 @@ impl MostSimpleStrategy {
             })
     }
 
-    /// This method tries to find a random good with an adequate quantity that the trader can buy
+    /// This method tries to find the cheapest good from all markets for the given max. EUR
+    /// quantity.
+    /// To get the cheapest good for a single market, its uses [`find_cheapest_good_from_market()`].
+    ///
+    /// The return value is (market name, (bid, Good to buy)).
     fn find_cheapest_good(
         &self,
         markets: &Vec<MarketRef>,
@@ -101,7 +118,7 @@ impl MostSimpleStrategy {
             .map(|m| {
                 (
                     m.get_name(),
-                    self.find_cheapest_good_from_market(&m, eur_quantity),
+                    self.find_cheapest_good_to_buy_from_market(&m, eur_quantity),
                 )
             })
             .filter(|(m, res)| res.is_some())
@@ -208,8 +225,14 @@ impl MostSimpleStrategy {
         self.get_good_for_kind(DEFAULT_GOOD_KIND, inventory)
     }
 
-    fn get_market_for_name<'a>(&'a self, name: &str, markets: &'a Vec<MarketRef>) -> Option<&MarketRef> {
-        markets.iter().find(|m| m.as_ref().borrow().get_name() == name)
+    fn get_market_for_name<'a>(
+        &'a self,
+        name: &str,
+        markets: &'a Vec<MarketRef>,
+    ) -> Option<&MarketRef> {
+        markets
+            .iter()
+            .find(|m| m.as_ref().borrow().get_name() == name)
     }
 }
 
@@ -428,7 +451,7 @@ mod tests {
     }
 
     #[test]
-    fn test_find_cheapest_good_from_market() {
+    fn test_find_cheapest_good_to_buy_from_market() {
         let quantity: f32 = 1_000.0;
         let market = ZSE::new_with_quantities(quantity, quantity, quantity, quantity);
 
@@ -438,18 +461,47 @@ mod tests {
         };
         let market = market.borrow();
 
-        let found_good = strategy.find_cheapest_good_from_market(&market, quantity);
-        assert_eq!(false, found_good.is_none(), "There has to be one cheapest good");
+        let found_good = strategy.find_cheapest_good_to_buy_from_market(&market, quantity);
+        assert_eq!(
+            false,
+            found_good.is_none(),
+            "There has to be one cheapest good"
+        );
 
         let (found_price, found_good) = found_good.unwrap();
-        assert_ne!(found_good.get_kind(), DEFAULT_GOOD_KIND, "Found Good can't be of kind {}", DEFAULT_GOOD_KIND);
-        assert!(found_price <= quantity, "The found price can't be higher than owned amount of EUR {}", quantity);
+        assert_ne!(
+            found_good.get_kind(),
+            DEFAULT_GOOD_KIND,
+            "Found Good can't be of kind {}",
+            DEFAULT_GOOD_KIND
+        );
+        assert!(
+            found_price <= quantity,
+            "The found price can't be higher than owned amount of EUR {}",
+            quantity
+        );
 
-        let market_good = market.get_goods().iter().find(|g| g.good_kind == found_good.get_kind()).unwrap().clone();
-        assert!(market_good.quantity >= found_good.get_qty(), "Found quantity can't be higher than the available quantity of {} {}", market_good.quantity, market_good.good_kind);
+        let market_good = market
+            .get_goods()
+            .iter()
+            .find(|g| g.good_kind == found_good.get_kind())
+            .unwrap()
+            .clone();
+        assert!(
+            market_good.quantity >= found_good.get_qty(),
+            "Found quantity can't be higher than the available quantity of {} {}",
+            market_good.quantity,
+            market_good.good_kind
+        );
 
-        let market_price = market.get_buy_price(found_good.get_kind(), found_good.get_qty()).unwrap();
-        assert_eq!(market_price, found_price, "Price of found good should be {}", market_price);
+        let market_price = market
+            .get_buy_price(found_good.get_kind(), found_good.get_qty())
+            .unwrap();
+        assert_eq!(
+            market_price, found_price,
+            "Price of found good should be {}",
+            market_price
+        );
     }
 
     #[test]
@@ -467,9 +519,19 @@ mod tests {
         let mut iter = goods.iter().filter(|l| l.good_kind != DEFAULT_GOOD_KIND);
         let high_eur = 1_000_000.0; // test with very high bid
         while let Some(label) = iter.next() {
-            let (price, qty) = strategy.find_adequate_bid(label, &market, high_eur).unwrap();
-            assert!(price <= high_eur, "Adequate buy price can't be higher than {}", high_eur);
-            assert!(qty > 0.0, "Quantity ({}) of adequate bid can't be less or equal to 0", qty);
+            let (price, qty) = strategy
+                .find_adequate_bid(label, &market, high_eur)
+                .unwrap();
+            assert!(
+                price <= high_eur,
+                "Adequate buy price can't be higher than {}",
+                high_eur
+            );
+            assert!(
+                qty > 0.0,
+                "Quantity ({}) of adequate bid can't be less or equal to 0",
+                qty
+            );
         }
     }
 }
