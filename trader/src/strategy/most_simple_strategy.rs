@@ -109,9 +109,13 @@ impl MostSimpleStrategy {
     /// The return value is (market name, (bid, Good to buy)).
     fn find_cheapest_good(
         &self,
-        markets: &Vec<MarketRef>,
+        markets: &Vec<&MarketRef>,
         eur_quantity: f32,
     ) -> Option<(&str, (f32, Good))> {
+        if eur_quantity <= 0.0 {
+            return None;
+        }
+
         markets
             .iter()
             .map(|m| m.as_ref().borrow())
@@ -240,7 +244,12 @@ impl Strategy for MostSimpleStrategy {
         }
     }
 
-    fn apply(&mut self, markets: &mut Vec<MarketRef>, goods: &mut Vec<Good>, trader_name: &String) {
+    fn apply(
+        &mut self,
+        markets: &mut Vec<&MarketRef>,
+        goods: &mut Vec<Good>,
+        trader_name: &String,
+    ) {
         // this is our eur good (merge and split from this ref)
         let mut eur = self.get_eur(goods).unwrap(); // todo: Maybe better error handling, but eur is always there
 
@@ -459,10 +468,7 @@ mod tests {
         let quantity: f32 = 1_000.0;
         let market = ZSE::new_with_quantities(quantity, quantity, quantity, quantity);
 
-        let strategy = MostSimpleStrategy {
-            buy_history: Vec::new(),
-            buy_tokens: Vec::new(),
-        };
+        let strategy = MostSimpleStrategy::new();
         let market = market.borrow();
         let goods = market.get_goods();
 
@@ -482,6 +488,57 @@ mod tests {
                 "Quantity ({}) of adequate bid can't be less or equal to 0",
                 qty
             );
+        }
+
+        #[test]
+        fn test_find_cheapest_good() {
+            let quantity = 100_000.0;
+            let smse = Smse::new_with_quantities(quantity, quantity, quantity, quantity);
+            let tase = TASE::new_with_quantities(quantity, quantity, quantity, quantity);
+            let zse = ZSE::new_with_quantities(quantity, quantity, quantity, quantity);
+            let markets = Vec::from([&smse, &tase, &zse]);
+
+            let strategy = MostSimpleStrategy::new();
+
+            // test with very high bid
+            let bid = 1_000_000.0;
+            let res = strategy.find_cheapest_good(&markets, bid);
+            assert_eq!(
+                true,
+                res.is_some(),
+                "For a high bid of {} something should be found",
+                bid
+            );
+            let (market_name, (price, good)) = res.unwrap();
+            assert_ne!(
+                DEFAULT_GOOD_KIND,
+                good.get_kind(),
+                "Found good can't be of kind {}",
+                DEFAULT_GOOD_KIND
+            );
+            assert!(
+                price <= bid,
+                "Cheapest price can't be higher than bid of {}",
+                bid
+            );
+            let cheapest_market = &markets
+                .iter()
+                .find(|m| m.borrow().get_name() == market_name)
+                .unwrap();
+            let cheapest_price = cheapest_market
+                .borrow_mut()
+                .get_buy_price(good.get_kind(), good.get_qty())
+                .unwrap();
+            assert_eq!(
+                cheapest_price, price,
+                "Cheapest found price {} must be equal to the one of the market {}",
+                price, cheapest_price
+            );
+
+            // test with 0.0 as bid
+            let bid = 0.0;
+            let res = strategy.find_cheapest_good(&markets, bid);
+            assert_ne!(true, res.is_some(), "No good should be found for bid of {}", bid);
         }
     }
 }
