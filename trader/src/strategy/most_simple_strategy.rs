@@ -133,28 +133,24 @@ impl MostSimpleStrategy {
     }
 
     /// Returns the highest selling market + price for the bought good
-    fn get_highest_selling_market<'a>(
+    fn find_highest_selling_market_for_good<'a>(
         &'a self,
-        markets: &'a Vec<MarketRef>,
+        markets: &'a Vec<&'a MarketRef>,
         good: &'a Good,
-        bought_price: f32,
-    ) -> Option<(&MarketRef, f32)> {
+        buy_price: f32,
+    ) -> Option<(&str, f32)> {
         markets
             .iter()
+            .map(|m| m.as_ref().borrow_mut())
             .map(|m| {
-                if let Ok(sell_price) = m
-                    .as_ref()
-                    .borrow()
-                    .get_sell_price(good.get_kind(), good.get_qty())
-                {
-                    Some((m, sell_price))
-                } else {
-                    None
-                }
+                (
+                    m.get_name(),
+                    m.get_sell_price(good.get_kind(), good.get_qty()),
+                )
             })
-            .filter(|r| r.is_some())
-            .map(|r| r.unwrap())
-            .filter(|(_, sell_price)| *sell_price > bought_price)
+            .filter(|(_, price)| price.is_ok())
+            .map(|(name, price)| (name, price.unwrap()))
+            .filter(|(_, sell_price)| *sell_price > buy_price)
             .reduce(|(market_a, price_a), (market_b, price_b)| {
                 if price_a > price_b {
                     (market_a, price_a)
@@ -171,7 +167,7 @@ impl MostSimpleStrategy {
         }
     }
 
-    fn sell_if_needed(
+    /*fn sell_if_needed(
         &mut self,
         markets: &mut Vec<MarketRef>,
         goods: &mut Vec<Good>,
@@ -207,7 +203,7 @@ impl MostSimpleStrategy {
                 }
             }
         }
-    }
+    }*/
 
     fn can_buy_good(&self, buy_price: f32, inventory: &Vec<Good>) -> bool {
         if let Some(eur) = inventory.iter().find(|g| g.get_kind() == DEFAULT_GOOD_KIND) {
@@ -285,6 +281,7 @@ mod tests {
     use crate::strategy::most_simple_strategy::{BuyHistory, MostSimpleStrategy};
     use crate::strategy::strategy::Strategy;
     use smse::Smse;
+    use std::rc::Rc;
     use unitn_market_2022::good::consts::DEFAULT_GOOD_KIND;
     use unitn_market_2022::good::good::Good;
     use unitn_market_2022::good::good_kind::GoodKind;
@@ -293,131 +290,84 @@ mod tests {
     use ZSE::market::ZSE;
 
     #[test]
-    fn get_highest_selling_market() {
+    fn test_find_highest_selling_market_for_good() {
         let quantity = 100_000.0;
         let smse = Smse::new_with_quantities(0.0, 0.0, quantity, 0.0);
         let tase = TASE::new_with_quantities(0.0, 0.0, quantity, 0.0);
         let zse = ZSE::new_with_quantities(0.0, 0.0, quantity, 0.0);
+        let markets = Vec::from([&smse, &tase, &zse]);
 
-        let smse_price = smse
+        let bought_qty = 10_000.0;
+        let zse_sell_price = zse
             .borrow()
-            .get_sell_price(GoodKind::USD, quantity)
-            .unwrap();
-        let tase_price = tase
-            .borrow()
-            .get_sell_price(GoodKind::USD, quantity)
-            .unwrap();
-        let zse_price = zse
-            .borrow()
-            .get_sell_price(GoodKind::USD, quantity)
+            .get_sell_price(GoodKind::USD, bought_qty)
             .unwrap();
 
-        println!(
-            "SMSE: {}, TASE: {}, ZSE: {}",
-            smse_price, tase_price, zse_price
-        );
+        let zse_name = zse.borrow().get_name();
 
-        let markets = Vec::from([smse, tase, zse]);
-
-        let highest_price = Vec::from([smse_price, tase_price, zse_price])
-            .iter()
-            .fold(0.0 as f32, |a, &b| a.max(b));
-
-        // Check with
         let strategy = MostSimpleStrategy::new();
-        let bought_price = 0.0; // doesnt matter, but lets assume we paid nothing, so every price is higher
-        let bought_good = Good::new(GoodKind::USD, quantity);
-        let (highest_selling_market, highest_market_price) = strategy
-            .get_highest_selling_market(&markets, &bought_good, bought_price)
+
+        // test with only one market
+        let only_zse = markets
+            .iter()
+            .find(|m| m.borrow().get_name() == zse_name)
             .unwrap();
-        println!(
-            "HIGHEST SELLING MARKET IS {} WITH {}",
-            highest_selling_market.borrow().get_name(),
-            highest_market_price
+        let only_zse = Vec::from([*only_zse]);
+        let bought_good = Good::new(GoodKind::USD, bought_qty);
+        let buy_price = zse_sell_price * 0.8; // a little bit less than the sell price
+        let res = strategy.find_highest_selling_market_for_good(&only_zse, &bought_good, buy_price);
+        assert_eq!(
+            true,
+            res.is_some(),
+            "At least one highest selling market should be found"
+        );
+        let (market_name, highest_sell_price) = res.unwrap();
+        assert_eq!(
+            zse_name, market_name,
+            "Highest selling market should be {}",
+            zse_name
+        );
+        assert_eq!(
+            zse_sell_price, highest_sell_price,
+            "Highest found sell price {} should be equal to {}",
+            highest_sell_price, zse_sell_price
         );
 
+        // test with one market but way too high buy price
+        let buy_price = zse_sell_price * 2.0;
+        let res = strategy.find_highest_selling_market_for_good(&only_zse, &bought_good, buy_price);
+        assert_ne!(
+            true,
+            res.is_some(),
+            "No selling offer should be found for buy price {}",
+            buy_price
+        );
+
+        // test with multiple markets
+        let buy_price = zse_sell_price * 0.8; // then at least zse should be found
+        let res = strategy.find_highest_selling_market_for_good(&markets, &bought_good, buy_price);
         assert_eq!(
-            highest_price, highest_market_price,
-            "The highest price must be {}",
-            highest_price
+            true,
+            res.is_some(),
+            "With multiple markets, there should be at least one selling market"
+        );
+        let (market_name, highest_sell_price) = res.unwrap();
+        let highest_selling_market = markets
+            .iter()
+            .find(|m| m.borrow().get_name() == market_name)
+            .unwrap();
+        let highest_selling_offer = highest_selling_market
+            .borrow_mut()
+            .get_sell_price(bought_good.get_kind(), bought_good.get_qty())
+            .unwrap();
+        assert_eq!(
+            highest_selling_offer, highest_sell_price,
+            "The highest selling price should be {}",
+            highest_selling_offer
         );
     }
 
     /*#[test]
-    fn test_get_adequate_good_to_buy() {
-        let eur_quantity = 300_000.0;
-        let strategy = MostSimpleStrategy::new();
-
-        // test with no goods
-        let market = ZSE::new_with_quantities(0.0, 0.0, 0.0, 0.0);
-        let good = strategy.get_adequate_good_to_buy(&market, eur_quantity);
-        assert_eq!(
-            true,
-            good.is_none(),
-            "There can't be any adequate good if the market is empty"
-        );
-
-        // test with only EUR
-        let market = ZSE::new_with_quantities(1_000_000.0, 0.0, 1_000_000.0, 0.0);
-        assert_eq!(
-            true,
-            good.is_none(),
-            "There can't be any adequate good if the market has only EUR"
-        );
-
-        // test with one good
-        let market = ZSE::new_with_quantities(0.0, 0.0, 1_000_000.0, 0.0);
-        let good = strategy.get_adequate_good_to_buy(&market, eur_quantity);
-        assert_eq!(
-            true,
-            good.is_some(),
-            "There must be at least one adequate good"
-        );
-        let good = good.unwrap();
-        let buy_price = market
-            .borrow()
-            .get_buy_price(good.get_kind(), good.get_qty())
-            .unwrap();
-        assert_eq!(
-            GoodKind::USD,
-            good.get_kind(),
-            "Found adequate good must be of kind USD"
-        );
-        assert_eq!(
-            true,
-            buy_price <= eur_quantity,
-            "Adequate price must be equal or lower than {}",
-            eur_quantity
-        );
-
-        // test with full market
-        let market = ZSE::new_with_quantities(500_000.0, 500_000.0, 500_000.0, 500_000.0);
-        let good = strategy.get_adequate_good_to_buy(&market, eur_quantity);
-        assert_eq!(
-            true,
-            good.is_some(),
-            "There must be at least one adequate good"
-        );
-        let good = good.unwrap();
-        let buy_price = market
-            .borrow()
-            .get_buy_price(good.get_kind(), good.get_qty())
-            .unwrap();
-        assert!(
-            good.get_kind() == GoodKind::USD
-                || good.get_kind() == GoodKind::YEN
-                || good.get_kind() == GoodKind::YUAN,
-            "Found adequate good must be of kind USD, YEN, or YUAN"
-        );
-        assert_eq!(
-            true,
-            buy_price <= eur_quantity,
-            "Adequate price must be equal or lower than {}",
-            eur_quantity
-        );
-    }*/
-
-    #[test]
     fn test_sell_if_needed() {
         let market = ZSE::new_with_quantities(500_000.0, 500_000.0, 500_000.0, 500_000.0);
         let usd_sell_price = market
@@ -448,7 +398,7 @@ mod tests {
             "After selling, EUR has to be {}",
             usd_sell_price
         );
-    }
+    }*/
 
     #[test]
     fn test_find_cheapest_good_to_buy_from_market() {
