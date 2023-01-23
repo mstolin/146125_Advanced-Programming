@@ -2,6 +2,8 @@ use crate::strategy::most_simple_strategy::MostSimpleStrategy;
 use crate::strategy::strategy::Strategy;
 use crate::MarketRef;
 use std::borrow::{Borrow, BorrowMut};
+use std::cell::RefCell;
+use std::rc::Rc;
 use unitn_market_2022::good::consts::DEFAULT_GOOD_KIND;
 use unitn_market_2022::good::good::Good;
 use unitn_market_2022::good::good_kind::GoodKind;
@@ -14,16 +16,15 @@ enum StrategyIdentifier {
 
 pub type TraderHistory = Vec<Vec<Good>>;
 
-struct Trader<'a> {
+struct Trader {
     name: String,
-    markets: Vec<&'a MarketRef>,
-    strategy: Box<dyn Strategy>,
+    strategy: RefCell<Box<dyn Strategy>>,
     goods: Vec<Good>,
     history: TraderHistory,
     days: u32,
 }
 
-impl<'a> Trader<'a> {
+impl Trader{
     /// Creates a vec with all available goods
     fn create_goods(default_quantity: f32) -> Vec<Good> {
         let eur = Good::new(GoodKind::EUR, default_quantity);
@@ -33,9 +34,9 @@ impl<'a> Trader<'a> {
         Vec::from([eur, usd, yen, yuan])
     }
 
-    fn init_strategy(id: StrategyIdentifier) -> Box<dyn Strategy> {
+    fn init_strategy(id: StrategyIdentifier, markets: Vec<MarketRef>) -> RefCell<Box<dyn Strategy>> {
         match id {
-            StrategyIdentifier::Most_Simple => Box::new(MostSimpleStrategy::new()),
+            StrategyIdentifier::Most_Simple => RefCell::new(Box::new(MostSimpleStrategy::new(markets))),
         }
     }
 
@@ -44,26 +45,26 @@ impl<'a> Trader<'a> {
         name: String,
         strategyId: StrategyIdentifier,
         start_capital: f32,
-        sgx: &'a MarketRef,
-        smse: &'a MarketRef,
-        tase: &'a MarketRef,
-        zse: &'a MarketRef,
+        sgx: MarketRef,
+        smse: MarketRef,
+        tase: MarketRef,
+        zse: MarketRef,
     ) -> Self {
         if start_capital <= 0.0 {
             panic!("start_capital must be greater than 0.0")
         }
 
         // All markets must subscribe to each other
-        subscribe_each_other!(*sgx, *smse, *tase, *zse);
+        subscribe_each_other!(sgx, smse, tase, zse);
 
         // init default goods
         let goods = Self::create_goods(start_capital);
         let history = Vec::from([goods.clone()]);
+        let markets = vec![sgx, smse, tase, zse];
 
         Self {
             name,
-            markets: Vec::from([sgx, smse, tase, zse]),
-            strategy: Self::init_strategy(strategyId),
+            strategy: Self::init_strategy(strategyId, markets),
             goods,
             history,
             days: 0,
@@ -71,18 +72,18 @@ impl<'a> Trader<'a> {
     }
 }
 
-impl<'a> Trader<'a> {
+impl Trader{
     fn increase_day_by_one(&mut self) {
         self.days += 1;
-        self.markets
+        /*self.markets // todo move this logic to the strategy
             .iter_mut()
-            .for_each(|m| wait_one_day!(m.as_ref()));
+            .for_each(|m| wait_one_day!(m.as_ref()));*/
     }
 
     /**
      * Applies the strategy every *n* minutes until the day is over.
      */
-    pub fn apply_strategy(&mut self, apply_every_minutes: u32) {
+    pub fn apply_strategy(&mut self, apply_every_minutes: u32) { // todo: Interior mut, no need that this method is mut
         let minutes_per_day: u32 = 24 * 60;
         if apply_every_minutes > minutes_per_day {
             panic!(
@@ -95,7 +96,8 @@ impl<'a> Trader<'a> {
         let interval_times = minutes_per_day / apply_every_minutes;
         for _ in 0..interval_times {
             self.strategy
-                .apply(&mut self.markets, &mut self.goods, &self.name); // todo: Maybe internal mutability pattern here
+                .borrow_mut()
+                .apply(&mut self.goods, &self.name);
         }
 
         // lastly increase day
@@ -117,6 +119,7 @@ impl<'a> Trader<'a> {
 
 #[cfg(test)]
 mod tests {
+    use std::rc::Rc;
     use crate::trader::{StrategyIdentifier, Trader};
     use crate::MarketRef;
     use smse::Smse;
@@ -142,12 +145,11 @@ mod tests {
             "TEST_TRADER".to_string(),
             StrategyIdentifier::Most_Simple,
             300_000.0,
-            &sgx,
-            &smse,
-            &tase,
-            &zse,
+            sgx,
+            smse,
+            tase,
+            zse,
         );
-        assert_eq!(4, trader.markets.len());
         assert_eq!(4, trader.goods.len());
     }
 
@@ -167,9 +169,42 @@ mod tests {
         assert_eq!(true, goods.contains(&yen), "{:?} not found in goods", yen);
     }
 
-    /*#[test]
-    fn test_init_strategy() {
-        let most_simple = Trader::init_strategy(StrategyIdentifier::Most_Simple);
-        assert_eq!()
-    }*/
+    #[test]
+    fn test_apply_strategy_for_one_week() {
+        let trader_name = "Test Trader".to_string();
+        let (sgx, smse, tase, zse) = init_random_markets();
+        let mut goods = Trader::create_goods(1_000_000.0);
+
+        println!("SGX STRONG COUNT: {}", Rc::strong_count(&sgx));
+        println!("SMSE STRONG COUNT: {}", Rc::strong_count(&smse));
+        println!("TASE STRONG COUNT: {}", Rc::strong_count(&tase));
+        println!("ZSE STRONG COUNT: {}", Rc::strong_count(&zse));
+        println!("---------------");
+
+        let mut trader = Trader::from(
+            trader_name,
+            StrategyIdentifier::Most_Simple,
+            1_000_000.0,
+            sgx,
+            smse,
+            tase,
+            zse
+            //Rc::clone(&sgx),
+            //Rc::clone(&smse), // todo HERE IS THE PROBLEM, STRONG COUNT ALREADY AT 2
+            //Rc::clone(&tase),
+            //Rc::clone(&zse)
+        );
+
+        /*println!("SGX STRONG COUNT: {}", Rc::strong_count(&sgx));
+        println!("SMSE STRONG COUNT: {}", Rc::strong_count(&smse));
+        println!("TASE STRONG COUNT: {}", Rc::strong_count(&tase));
+        println!("ZSE STRONG COUNT: {}", Rc::strong_count(&zse));
+        println!("---------------");*/
+
+        dbg!(&goods);
+        while trader.get_days() < 7 {
+            trader.apply_strategy(30);
+        }
+        dbg!(&goods);
+    }
 }

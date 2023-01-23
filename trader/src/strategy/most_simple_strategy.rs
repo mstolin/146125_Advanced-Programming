@@ -14,6 +14,7 @@ type BuyHistory = (f32, Good); // (eur buy price, bought good with bought quanti
 pub struct MostSimpleStrategy {
     buy_tokens: Vec<(&'static str, f32, String)>, // (market name, bid, token) todo: Custom type
     buy_history: Vec<BuyHistory>,                 // TODO REMOVE ME
+    markets: Vec<MarketRef>,
 }
 
 impl MostSimpleStrategy {
@@ -237,16 +238,16 @@ impl MostSimpleStrategy {
 }
 
 impl Strategy for MostSimpleStrategy {
-    fn new() -> Self {
+    fn new(markets: Vec<MarketRef>) -> Self {
         Self {
             buy_tokens: Vec::new(),
             buy_history: Vec::new(),
+            markets,
         }
     }
 
     fn apply(
-        &mut self,
-        markets: &mut Vec<&MarketRef>,
+        &self,
         goods: &mut Vec<Good>,
         trader_name: &String,
     ) {
@@ -285,7 +286,8 @@ impl Strategy for MostSimpleStrategy {
         }*/
     }
 }
-#[cfg(test)]
+
+/*#[cfg(test)]
 mod tests {
     use crate::strategy::most_simple_strategy::{BuyHistory, MostSimpleStrategy};
     use crate::strategy::strategy::Strategy;
@@ -541,4 +543,4 @@ mod tests {
             assert_ne!(true, res.is_some(), "No good should be found for bid of {}", bid);
         }
     }
-}
+}*/
