@@ -55,7 +55,8 @@ impl Trader{
         }
 
         // All markets must subscribe to each other
-        subscribe_each_other!(sgx, smse, tase, zse);
+        // todo this will throw an error
+        // subscribe_each_other!(Rc::clone(&sgx), Rc::clone(&smse), Rc::clone(&tase), Rc::clone(&zse));
 
         // init default goods
         let goods = Self::create_goods(start_capital);
