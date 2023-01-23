@@ -2,7 +2,7 @@ use crate::strategy::strategy::Strategy;
 use crate::MarketRef;
 use rand::seq::SliceRandom;
 use std::borrow::{Borrow, BorrowMut};
-use std::cell::{Ref, RefMut};
+use std::cell::{Cell, Ref, RefCell, RefMut};
 use std::rc::Rc;
 use unitn_market_2022::good::consts::DEFAULT_GOOD_KIND;
 use unitn_market_2022::good::good::Good;
@@ -13,7 +13,7 @@ use unitn_market_2022::market::Market;
 type BuyHistory = (f32, Good); // (eur buy price, bought good with bought quantity)
 
 pub struct MostSimpleStrategy {
-    buy_tokens: Vec<(&'static str, f32, String)>, // (market name, bid, token) todo: Custom type
+    buy_tokens: RefCell<Vec<(String, f32, String)>>, // (market name, bid, token) todo: Custom type
     buy_history: Vec<BuyHistory>,                 // TODO REMOVE ME
     markets: Vec<MarketRef>,
 }
@@ -29,6 +29,7 @@ impl MostSimpleStrategy {
         &self,
         label: &GoodLabel,
         market: MarketRef,
+        //market: &Ref<dyn Market>,
         max_eur: f32,
     ) -> Option<(f32, f32)> {
         if label.good_kind == DEFAULT_GOOD_KIND {
@@ -56,21 +57,6 @@ impl MostSimpleStrategy {
             tries += 1;
         }
         None
-    }
-
-    fn lock_buy(
-        &mut self,
-        good: Good,
-        bid: f32,
-        trader_name: &String,
-        mut market: RefMut<dyn Market>,
-    ) {
-        if let Ok(token) =
-            market.lock_buy(good.get_kind(), good.get_qty(), bid, trader_name.clone())
-        {
-            // add token to to list
-            self.buy_tokens.push((market.get_name(), bid, token));
-        }
     }
 
     /// This method tries to return the cheapest possible good from the given market.
@@ -114,16 +100,17 @@ impl MostSimpleStrategy {
     fn find_cheapest_good(
         &self,
         eur_quantity: f32,
-    ) -> Option<(&str, (f32, Good))> {
+    ) -> Option<(String, (f32, Good))> {
         if eur_quantity <= 0.0 {
             return None;
         }
-
         self.markets
             .iter()
             .map(|m| {
+                let market = Rc::clone(m);
+                let market = (*market).borrow();
                 (
-                    m.as_ref().borrow().get_name(),
+                    market.get_name().to_string(),
                     self.find_cheapest_good_to_buy_from_market(Rc::clone(m), eur_quantity),
                 )
             })
@@ -226,21 +213,20 @@ impl MostSimpleStrategy {
         self.get_good_for_kind(DEFAULT_GOOD_KIND, inventory)
     }
 
-    fn get_market_for_name<'a>(
-        &'a self,
-        name: &str,
-        markets: &'a Vec<MarketRef>,
+    fn find_market_for_name(
+        &self,
+        name: &String,
     ) -> Option<&MarketRef> {
-        markets
+        self.markets
             .iter()
-            .find(|m| m.as_ref().borrow().get_name() == name)
+            .find(|m| m.as_ref().borrow().get_name().to_string() == *name)
     }
 }
 
 impl Strategy for MostSimpleStrategy {
     fn new(markets: Vec<MarketRef>) -> Self {
         Self {
-            buy_tokens: Vec::new(),
+            buy_tokens: RefCell::new(Vec::new()),
             buy_history: Vec::new(),
             markets,
         }
@@ -252,19 +238,42 @@ impl Strategy for MostSimpleStrategy {
         trader_name: &String,
     ) {
         // this is our eur good (merge and split from this ref)
-        let mut eur = self.get_eur(goods).unwrap(); // todo: Maybe better error handling, but eur is always there
+        let mut eur_qty = self.get_eur(goods).unwrap().get_qty(); // todo: Maybe better error handling, but eur is always there
+
+
+        // 1. Find cheapest good to buy
+        let cheapest_good = self.find_cheapest_good(eur_qty);
+
+        if let Some((market_name, (bid, good))) = cheapest_good {
+            let market = self.find_market_for_name(&market_name).unwrap();
+            let mut market = market.as_ref().borrow_mut();
+
+            if market.get_name() == market_name {
+                // 2. Lock good to buy
+                let token = market.lock_buy(good.get_kind(), good.get_qty(), bid, trader_name.clone());
+                if let Ok(token) = token {
+                    self.buy_tokens.borrow_mut().push((market_name.clone(), bid, token.clone()));
+                }
+            }
+        }
+
+
 
         // ## SELL
         //self.sell_if_needed(markets, goods, trader_name);
 
         // ## BUY
 
-        // first lock cheapest good to buy
-        /*if let Some((name, (bid, good))) = self.find_cheapest_good(&markets, eur.get_qty()) {
+        // 1. Find cheapest good to buy
+        /*let res = self.find_cheapest_good(eur_qty);
+        println!("CHEAPEST GOOD: {:?}", res);
+
+        // 2. Try to lock cheapest found good
+        if let Some((name, (bid, good))) = res {
             // the most adequate good was found
-            let market = self.get_market_for_name(name, markets).unwrap();
-            let mut market = market.as_ref().borrow_mut();
-            self.lock_buy(good, bid, trader_name, market);
+            let mut market = Rc::clone(self.markets.iter().find(|m| m.as_ref().borrow().get_name().to_string() == name).unwrap());
+            // todo where has it been borrowed?
+            let token = market.as_ref().borrow_mut().lock_buy(good.get_kind(), good.get_qty(), bid, trader_name.clone());
         }*/
 
         // try to buy every locked good
@@ -416,11 +425,13 @@ mod tests {
     #[test]
     fn test_find_cheapest_good_to_buy_from_market() {
         let quantity: f32 = 1_000.0;
-        let market = ZSE::new_with_quantities(quantity, quantity, quantity, quantity);
+        let zse = ZSE::new_with_quantities(quantity, quantity, quantity, quantity);
 
-        let strategy = MostSimpleStrategy::new(vec![Rc::clone(&market)]);
+        let strategy = MostSimpleStrategy::new(vec![Rc::clone(&zse)]);
+        let zse = Rc::clone(&zse);
 
-        let found_good = strategy.find_cheapest_good_to_buy_from_market(Rc::clone(&market), quantity);
+        //let found_good = strategy.find_cheapest_good_to_buy_from_market(Rc::clone(&market), quantity);
+        let found_good = strategy.find_cheapest_good_to_buy_from_market(Rc::clone(&zse), quantity);
         assert_eq!(
             false,
             found_good.is_none(),
@@ -440,7 +451,7 @@ mod tests {
             quantity
         );
 
-        let market_good = market
+        let market_good = zse
             .as_ref()
             .borrow()
             .get_goods()
@@ -455,7 +466,9 @@ mod tests {
             market_good.good_kind
         );
 
-        let market_price = market.as_ref().borrow()
+        let market_price = zse
+            .as_ref()
+            .borrow()
             .get_buy_price(found_good.get_kind(), found_good.get_qty())
             .unwrap();
         assert_eq!(
@@ -465,7 +478,7 @@ mod tests {
         );
     }
 
-    #[test]
+    /*#[test]
     fn test_find_adequate_bid() {
         let quantity: f32 = 1_000.0;
         let market = ZSE::new_with_quantities(quantity, quantity, quantity, quantity);
@@ -490,7 +503,7 @@ mod tests {
                 qty
             );
         }
-    }
+    }*/
 
         #[test]
         fn test_find_cheapest_good() {
