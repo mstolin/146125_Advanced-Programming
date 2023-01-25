@@ -127,6 +127,7 @@ mod tests {
     use unitn_market_2022::good::good::Good;
     use unitn_market_2022::good::good_kind::GoodKind;
     use unitn_market_2022::market::Market;
+    use unitn_market_2022::subscribe_each_other;
     use SGX::market::sgx::SGX;
     use TASE::TASE;
     use ZSE::market::ZSE;
@@ -136,6 +137,7 @@ mod tests {
         let smse = Smse::new_random();
         let tase = TASE::new_random();
         let zse = ZSE::new_random();
+        //subscribe_each_other!(&sgx, &smse, &tase, &zse);
         (sgx, smse, tase, zse)
     }
 
@@ -174,38 +176,22 @@ mod tests {
     fn test_apply_strategy_for_one_week() {
         let trader_name = "Test Trader".to_string();
         let (sgx, smse, tase, zse) = init_random_markets();
-        let mut goods = Trader::create_goods(1_000_000.0);
-
-        println!("SGX STRONG COUNT: {}", Rc::strong_count(&sgx));
-        println!("SMSE STRONG COUNT: {}", Rc::strong_count(&smse));
-        println!("TASE STRONG COUNT: {}", Rc::strong_count(&tase));
-        println!("ZSE STRONG COUNT: {}", Rc::strong_count(&zse));
-        println!("---------------");
-
+        
         let mut trader = Trader::from(
             trader_name,
             StrategyIdentifier::Most_Simple,
             1_000_000.0,
-            sgx,
-            smse,
-            tase,
-            zse
-            //Rc::clone(&sgx),
-            //Rc::clone(&smse), // todo HERE IS THE PROBLEM, STRONG COUNT ALREADY AT 2
-            //Rc::clone(&tase),
-            //Rc::clone(&zse)
+            Rc::clone(&sgx),
+            Rc::clone(&smse),
+            Rc::clone(&tase),
+            Rc::clone(&zse)
         );
 
-        /*println!("SGX STRONG COUNT: {}", Rc::strong_count(&sgx));
-        println!("SMSE STRONG COUNT: {}", Rc::strong_count(&smse));
-        println!("TASE STRONG COUNT: {}", Rc::strong_count(&tase));
-        println!("ZSE STRONG COUNT: {}", Rc::strong_count(&zse));
-        println!("---------------");*/
-
-        dbg!(&goods);
+        dbg!(trader.get_history());
+        println!("---------------------");
         while trader.get_days() < 7 {
             trader.apply_strategy(30);
         }
-        dbg!(&goods);
+        dbg!(trader.get_history());
     }
 }
