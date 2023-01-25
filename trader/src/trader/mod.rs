@@ -76,16 +76,10 @@ impl Trader {
 }
 
 impl Trader {
-    fn increase_day_by_one(&mut self) {
-        self.days += 1;
-        /*self.markets // todo move this logic to the strategy
-        .iter_mut()
-        .for_each(|m| wait_one_day!(m.as_ref()));*/
-    }
-
-    /**
-     * Applies the strategy every *n* minutes until the day is over.
-     */
+    /// Applies the selected strategy every *n* minutes.
+    /// It simulates minutes by calculating how many times the strategy has to be
+    /// applied for a using *t = 24 * 60 / n* where *n* is defined as mentioned above.
+    /// Then, it applies the strategy exactly *t* times.
     pub fn apply_strategy(&mut self, apply_every_minutes: u32) {
         // todo: Interior mut, no need that this method is mut
         let minutes_per_day: u32 = 24 * 60;
