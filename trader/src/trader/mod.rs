@@ -19,7 +19,7 @@ pub type TraderHistory = Vec<Vec<Good>>;
 struct Trader {
     name: String,
     strategy: RefCell<Box<dyn Strategy>>,
-    goods: Vec<Good>,
+    goods: RefCell<Vec<Good>>,
     history: RefCell<TraderHistory>,
     days: RefCell<u32>,
 }
@@ -68,7 +68,7 @@ impl Trader {
         Self {
             name,
             strategy: Self::init_strategy(strategyId, markets),
-            goods,
+            goods: RefCell::new(goods),
             history,
             days: RefCell::new(0),
         }
@@ -80,7 +80,7 @@ impl Trader {
     /// It simulates minutes by calculating how many times the strategy has to be
     /// applied for a using *t = 24 * 60 / n* where *n* is defined as mentioned above.
     /// Then, it applies the strategy exactly *t* times.
-    pub fn apply_strategy(&mut self, apply_every_minutes: u32) {
+    pub fn apply_strategy(&self, apply_every_minutes: u32) {
         // todo: Interior mut, no need that this method is mut
         let minutes_per_day: u32 = 24 * 60;
         if apply_every_minutes > minutes_per_day {
@@ -95,7 +95,7 @@ impl Trader {
         for _ in 0..interval_times {
             self.strategy
                 .borrow_mut()
-                .apply(&mut self.goods, &self.name);
+                .apply(&mut self.goods.borrow_mut(), &self.name);
         }
 
         // lastly increase day
@@ -103,7 +103,7 @@ impl Trader {
         *days+=1;
         self.strategy.borrow().increase_day_by_one();
         // add updated goods after one day to the history
-        self.history.borrow_mut().push(self.goods.clone());
+        self.history.borrow_mut().push(self.goods.borrow().clone());
     }
 
     /// Returns the number of days the agent is running
@@ -150,7 +150,7 @@ mod tests {
             300_000.0,
             markets,
         );
-        assert_eq!(4, trader.goods.len());
+        assert_eq!(4, trader.goods.borrow().len());
     }
 
     #[test]
