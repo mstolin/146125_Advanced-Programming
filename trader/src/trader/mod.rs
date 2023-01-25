@@ -21,7 +21,7 @@ struct Trader {
     strategy: RefCell<Box<dyn Strategy>>,
     goods: Vec<Good>,
     history: TraderHistory,
-    days: u32,
+    days: RefCell<u32>,
 }
 
 impl Trader {
@@ -70,7 +70,7 @@ impl Trader {
             strategy: Self::init_strategy(strategyId, markets),
             goods,
             history,
-            days: 0,
+            days: RefCell::new(0),
         }
     }
 }
@@ -99,7 +99,8 @@ impl Trader {
         }
 
         // lastly increase day
-        self.days+=1;
+        let mut days = self.days.borrow_mut();
+        *days+=1;
         self.strategy.borrow().increase_day_by_one();
         // add updated goods after one day to the history
         self.history.push(self.goods.clone());
@@ -107,7 +108,7 @@ impl Trader {
 
     /// Returns the number of days the agent is running
     pub fn get_days(&self) -> u32 {
-        self.days
+        *self.days.borrow()
     }
 
     /// Returns the history of the trader
