@@ -3,6 +3,7 @@ use crate::MarketRef;
 use rand::seq::SliceRandom;
 use std::borrow::{Borrow, BorrowMut};
 use std::cell::{Cell, Ref, RefCell, RefMut};
+use std::ops::Index;
 use std::rc::Rc;
 use unitn_market_2022::good::consts::DEFAULT_GOOD_KIND;
 use unitn_market_2022::good::good::Good;
@@ -10,11 +11,14 @@ use unitn_market_2022::good::good_kind::GoodKind;
 use unitn_market_2022::market::good_label::GoodLabel;
 use unitn_market_2022::market::Market;
 
-type BuyHistory = (f32, Good); // (eur buy price, bought good with bought quantity)
+type BuyTokenHistory = (String, f32, String); // (market name, bid, buy token)
+type SellTokenHistory = (String, Good, String); // (market name, locked good, buy token)
+type GoodHistory = (f32, Good); // (eur price, bought good with bought quantity)
 
 pub struct MostSimpleStrategy {
-    buy_tokens: RefCell<Vec<(String, f32, String)>>, // (market name, bid, token) todo: Custom type
-    buy_history: Vec<BuyHistory>,                 // TODO REMOVE ME
+    buy_tokens: RefCell<Vec<BuyTokenHistory>>,
+    buy_history: RefCell<Vec<GoodHistory>>,
+    sell_tokens: RefCell<Vec<SellTokenHistory>>,
     markets: Vec<MarketRef>,
 }
 
@@ -159,58 +163,8 @@ impl MostSimpleStrategy {
         }
     }
 
-    /*fn sell_if_needed(
-        &mut self,
-        markets: &mut Vec<MarketRef>,
-        goods: &mut Vec<Good>,
-        trader_name: &String,
-    ) {
-        if !self.buy_history.is_empty() {
-            // there are still goods to sell
-            for (bought_price, bought_good) in &self.buy_history {
-                if let Some((market, offer)) =
-                    self.get_highest_selling_market(markets, bought_good, *bought_price)
-                {
-                    let mut market = market.as_ref().borrow_mut();
-                    if let Ok(token) = market.lock_sell(
-                        bought_good.get_kind(),
-                        bought_good.get_qty(),
-                        offer,
-                        trader_name.clone(),
-                    ) {
-                        let mut good_clone = bought_good.clone();
-                        if let Ok(eur) = market.sell(token, &mut good_clone) {
-                            // sell was successful, need to update our eur quantity
-                            self.increase_eur_qty(goods, eur);
-                        }
-                    }
-                } else {
-                    // no highest selling market found
-                    println!(
-                        "No adequate market was found for bought good {}{} for bought price {}EUR",
-                        bought_good.get_qty(),
-                        bought_good.get_kind(),
-                        bought_price
-                    );
-                }
-            }
-        }
-    }*/
-
-    fn can_buy_good(&self, buy_price: f32, inventory: &Vec<Good>) -> bool {
-        if let Some(eur) = inventory.iter().find(|g| g.get_kind() == DEFAULT_GOOD_KIND) {
-            eur.get_qty() >= buy_price
-        } else {
-            false
-        }
-    }
-
-    fn get_good_for_kind<'a>(&'a self, kind: GoodKind, inventory: &'a Vec<Good>) -> Option<&Good> {
-        inventory.iter().find(|g| g.get_kind() == kind)
-    }
-
-    fn get_eur<'a>(&'a self, inventory: &'a Vec<Good>) -> Option<&Good> {
-        self.get_good_for_kind(DEFAULT_GOOD_KIND, inventory)
+    fn get_mut_good_for_kind<'a>(&'a self, kind: GoodKind, inventory: &'a mut Vec<Good>) -> Option<&mut Good> {
+        inventory.iter_mut().find(|g| g.get_kind() == kind)
     }
 
     fn find_market_for_name(
@@ -221,13 +175,32 @@ impl MostSimpleStrategy {
             .iter()
             .find(|m| m.as_ref().borrow().get_name().to_string() == *name)
     }
+
+    fn can_we_sell(&self, inventory: &Vec<Good>) -> bool {
+        inventory.iter().filter(|g| g.get_kind() != DEFAULT_GOOD_KIND).count() > 0
+    }
+
+    fn find_highest_selling_market(&self, good: &Good, buy_price: f32) -> Option<(f32, String)> {
+        for market in &self.markets {
+            let market = Rc::clone(market);
+            let market = market.as_ref().borrow();
+            if let Ok(sell_price) = market.get_sell_price(good.get_kind(), good.get_qty()) {
+                if sell_price > buy_price {
+                    // sell price is bigger than our buy price
+                    return Some((sell_price, market.get_name().to_string()));
+                }
+            }
+        }
+        None
+    }
 }
 
 impl Strategy for MostSimpleStrategy {
     fn new(markets: Vec<MarketRef>) -> Self {
         Self {
             buy_tokens: RefCell::new(Vec::new()),
-            buy_history: Vec::new(),
+            buy_history: RefCell::new(Vec::new()),
+            sell_tokens: RefCell::new(Vec::new()),
             markets,
         }
     }
@@ -237,13 +210,15 @@ impl Strategy for MostSimpleStrategy {
         goods: &mut Vec<Good>,
         trader_name: &String,
     ) {
+        let mut buy_tokens = self.buy_tokens.borrow_mut();
         // this is our eur good (merge and split from this ref)
-        let mut eur_qty = self.get_eur(goods).unwrap().get_qty(); // todo: Maybe better error handling, but eur is always there
+        let mut eur_qty = self.get_mut_good_for_kind(GoodKind::EUR, goods).unwrap().get_qty(); // todo: Maybe better error handling, but eur is always there
 
 
         // 1. Find cheapest good to buy
         let cheapest_good = self.find_cheapest_good(eur_qty);
 
+        // 2. If a cheapest good has been found, try to lock it
         if let Some((market_name, (bid, good))) = cheapest_good {
             let market = self.find_market_for_name(&market_name).unwrap();
             let mut market = market.as_ref().borrow_mut();
@@ -252,54 +227,88 @@ impl Strategy for MostSimpleStrategy {
                 // 2. Lock good to buy
                 let token = market.lock_buy(good.get_kind(), good.get_qty(), bid, trader_name.clone());
                 if let Ok(token) = token {
-                    self.buy_tokens.borrow_mut().push((market_name.clone(), bid, token.clone()));
+                    buy_tokens.push((market_name.clone(), bid, token.clone()));
                 }
             }
         }
 
-
-
-        // ## SELL
-        //self.sell_if_needed(markets, goods, trader_name);
-
-        // ## BUY
-
-        // 1. Find cheapest good to buy
-        /*let res = self.find_cheapest_good(eur_qty);
-        println!("CHEAPEST GOOD: {:?}", res);
-
-        // 2. Try to lock cheapest found good
-        if let Some((name, (bid, good))) = res {
-            // the most adequate good was found
-            let mut market = Rc::clone(self.markets.iter().find(|m| m.as_ref().borrow().get_name().to_string() == name).unwrap());
-            // todo where has it been borrowed?
-            let token = market.as_ref().borrow_mut().lock_buy(good.get_kind(), good.get_qty(), bid, trader_name.clone());
-        }*/
-
-        // try to buy every locked good
-        /*for (index, (market_name, bid, token)) in self.buy_tokens.iter().enumerate() {
-            let market = self.get_market_for_name(market_name, markets).unwrap();
+        // 3. Buy every locked good
+        let mut bought_tokens: Vec<BuyTokenHistory> = Vec::new();
+        for buy_token_history in buy_tokens.iter_mut() {
+            let (market_name, bid, token) = buy_token_history;
+            let market = self.find_market_for_name(market_name).unwrap();
             let mut market = market.as_ref().borrow_mut();
+
+            //println!("TRY TO BUY {} FROM {}", token, market_name);
 
             let mut cash = Good::new(GoodKind::EUR, *bid);
             if let Ok(bought_good) = market.buy(token.clone(), &mut cash) {
-                // successfully bought the good, so merge with our inventory and remove the token
-                self.buy_tokens.remove(index);
-
                 // todo Better error handling
-                let mut our_good = self.get_good_for_kind(bought_good.get_kind(), goods).unwrap();
-                let _ = our_good.merge(bought_good);
+                let mut our_good = self.get_mut_good_for_kind(bought_good.get_kind(), goods).unwrap();
+                let _ = our_good.merge(bought_good.clone()); // TODO Check this: like in sell
                 // reduce our EURs with the buy price
-                let _ = eur.split(cash.get_qty());
+                let mut our_eur = self.get_mut_good_for_kind(GoodKind::EUR, goods).unwrap();
+                let _ = our_eur.split(cash.get_qty());
+                // also add the buy to the buy history
+                self.buy_history.borrow_mut().push((*bid, bought_good));
+                bought_tokens.push(buy_token_history.clone());
             }
-        }*/
+        }
+
+        // remove buy token
+        for buy_token_history in bought_tokens {
+            let index = buy_tokens.iter().position(|t| *t == buy_token_history).unwrap();
+            buy_tokens.remove(index);
+        }
+
+        // ## SELL
+
+        // 1. Lock
+        for (buy_price, good) in self.buy_history.borrow().iter() {
+            // Do not sell EUR
+            if good.get_kind() == DEFAULT_GOOD_KIND {
+                continue;
+            }
+
+            // Find the market with highest sell price
+            if let Some((sell_price, market_name)) = self.find_highest_selling_market(good, *buy_price) {
+                // found an adequate market, now need to lock the good
+                let market = self.find_market_for_name(&market_name).unwrap(); // todo error handling
+                let mut market = market.as_ref().borrow_mut();
+                if let Ok(token) = market.lock_sell(good.get_kind(), good.get_qty(), sell_price, trader_name.clone()) {
+                    // successfully locked good for sell, add token with price to the sell token history
+                    self.sell_tokens.borrow_mut().push((market_name, good.clone(), token));
+                }
+            }
+        }
+
+        // 2. Actually sell
+        let mut sold_tokens: Vec<SellTokenHistory> = Vec::new();
+        let mut sell_tokens = self.sell_tokens.borrow_mut();
+        for sell_token_history in sell_tokens.iter_mut() {
+            let (market_name, good, token) = sell_token_history;
+            let market = self.find_market_for_name(&market_name).unwrap(); // todo error handling
+            let mut market = market.as_ref().borrow_mut();
+
+            if let Ok(cash) = market.sell(token.clone(), good) {
+                let mut our_eur = self.get_mut_good_for_kind(GoodKind::EUR, goods).unwrap();
+                let _ = our_eur.merge(cash); // todo handle the error
+                sold_tokens.push(sell_token_history.clone());
+            }
+        }
+
+        // Remove old tokens that have been bought
+        for sell_token_history in sold_tokens {
+            let index = sell_tokens.iter().position(|t| *t == sell_token_history).unwrap();
+            sell_tokens.remove(index);
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use std::borrow::Borrow;
-    use crate::strategy::most_simple_strategy::{BuyHistory, MostSimpleStrategy};
+    use crate::strategy::most_simple_strategy::MostSimpleStrategy;
     use crate::strategy::strategy::Strategy;
     use smse::Smse;
     use std::rc::Rc;
