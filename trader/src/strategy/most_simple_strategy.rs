@@ -10,6 +10,7 @@ use unitn_market_2022::good::good::Good;
 use unitn_market_2022::good::good_kind::GoodKind;
 use unitn_market_2022::market::good_label::GoodLabel;
 use unitn_market_2022::market::Market;
+use unitn_market_2022::wait_one_day;
 
 type BuyTokenHistory = (String, f32, String); // (market name, bid, buy token)
 type SellTokenHistory = (String, Good, String); // (market name, locked good, buy token)
@@ -216,6 +217,12 @@ impl Strategy for MostSimpleStrategy {
         }
     }
 
+    fn increase_day_by_one(&self) {
+        self.markets.iter().for_each(|m| {
+            wait_one_day!(Rc::clone(m))
+        });
+    }
+
     fn apply(&self, goods: &mut Vec<Good>, trader_name: &String) {
         let mut buy_tokens = self.buy_tokens.borrow_mut();
         // this is our eur good (merge and split from this ref)
@@ -248,8 +255,6 @@ impl Strategy for MostSimpleStrategy {
             let (market_name, bid, token) = buy_token_history;
             let market = self.find_market_for_name(market_name).unwrap();
             let mut market = market.as_ref().borrow_mut();
-
-            //println!("TRY TO BUY {} FROM {}", token, market_name);
 
             let mut cash = Good::new(GoodKind::EUR, *bid);
             if let Ok(bought_good) = market.buy(token.clone(), &mut cash) {

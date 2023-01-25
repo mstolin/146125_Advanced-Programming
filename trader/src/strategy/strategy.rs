@@ -7,5 +7,6 @@ pub trait Strategy {
     fn new(markets: Vec<MarketRef>) -> Self
     where
         Self: Sized;
+    fn increase_day_by_one(&self);
     fn apply(&self, goods: &mut Vec<Good>, trader_name: &String);
 }
