@@ -100,7 +100,7 @@ impl Trader {
 
         // lastly increase day
         let mut days = self.days.borrow_mut();
-        *days+=1;
+        *days += 1;
         self.strategy.borrow().increase_day_by_one();
         // add updated goods after one day to the history
         self.history.borrow_mut().push(self.goods.borrow().clone());
@@ -174,13 +174,18 @@ mod tests {
         let trader_name = "Test Trader".to_string();
         let (sgx, smse, tase, zse) = init_random_markets();
         //let markets = vec![sgx, smse, tase, zse];
-        let markets = vec![Rc::clone(&sgx), Rc::clone(&smse), Rc::clone(&tase), Rc::clone(&zse)];
+        let markets = vec![
+            Rc::clone(&sgx),
+            Rc::clone(&smse),
+            Rc::clone(&tase),
+            Rc::clone(&zse),
+        ];
 
         let mut trader = Trader::from(
             trader_name,
             StrategyIdentifier::Most_Simple,
             1_000_000.0,
-            markets
+            markets,
         );
 
         while trader.get_days() < 7 {

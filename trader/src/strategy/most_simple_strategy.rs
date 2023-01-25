@@ -1,11 +1,11 @@
 use crate::strategy::strategy::Strategy;
 use crate::MarketRef;
 use rand::seq::SliceRandom;
+use rand::thread_rng;
 use std::borrow::{Borrow, BorrowMut};
 use std::cell::{Cell, Ref, RefCell, RefMut};
 use std::ops::Index;
 use std::rc::Rc;
-use rand::thread_rng;
 use unitn_market_2022::good::consts::DEFAULT_GOOD_KIND;
 use unitn_market_2022::good::good::Good;
 use unitn_market_2022::good::good_kind::GoodKind;
@@ -219,9 +219,9 @@ impl Strategy for MostSimpleStrategy {
     }
 
     fn increase_day_by_one(&self) {
-        self.markets.iter().for_each(|m| {
-            wait_one_day!(Rc::clone(m))
-        });
+        self.markets
+            .iter()
+            .for_each(|m| wait_one_day!(Rc::clone(m)));
     }
 
     fn apply(&self, goods: &mut Vec<Good>, trader_name: &String) {
