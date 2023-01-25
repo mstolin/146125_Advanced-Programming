@@ -24,7 +24,7 @@ struct Trader {
     days: u32,
 }
 
-impl Trader{
+impl Trader {
     /// Creates a vec with all available goods
     fn create_goods(default_quantity: f32) -> Vec<Good> {
         let eur = Good::new(GoodKind::EUR, default_quantity);
@@ -34,9 +34,14 @@ impl Trader{
         Vec::from([eur, usd, yen, yuan])
     }
 
-    fn init_strategy(id: StrategyIdentifier, markets: Vec<MarketRef>) -> RefCell<Box<dyn Strategy>> {
+    fn init_strategy(
+        id: StrategyIdentifier,
+        markets: Vec<MarketRef>,
+    ) -> RefCell<Box<dyn Strategy>> {
         match id {
-            StrategyIdentifier::Most_Simple => RefCell::new(Box::new(MostSimpleStrategy::new(markets))),
+            StrategyIdentifier::Most_Simple => {
+                RefCell::new(Box::new(MostSimpleStrategy::new(markets)))
+            }
         }
     }
 
@@ -73,18 +78,19 @@ impl Trader{
     }
 }
 
-impl Trader{
+impl Trader {
     fn increase_day_by_one(&mut self) {
         self.days += 1;
         /*self.markets // todo move this logic to the strategy
-            .iter_mut()
-            .for_each(|m| wait_one_day!(m.as_ref()));*/
+        .iter_mut()
+        .for_each(|m| wait_one_day!(m.as_ref()));*/
     }
 
     /**
      * Applies the strategy every *n* minutes until the day is over.
      */
-    pub fn apply_strategy(&mut self, apply_every_minutes: u32) { // todo: Interior mut, no need that this method is mut
+    pub fn apply_strategy(&mut self, apply_every_minutes: u32) {
+        // todo: Interior mut, no need that this method is mut
         let minutes_per_day: u32 = 24 * 60;
         if apply_every_minutes > minutes_per_day {
             panic!(
@@ -120,10 +126,10 @@ impl Trader{
 
 #[cfg(test)]
 mod tests {
-    use std::rc::Rc;
     use crate::trader::{StrategyIdentifier, Trader};
     use crate::MarketRef;
     use smse::Smse;
+    use std::rc::Rc;
     use unitn_market_2022::good::good::Good;
     use unitn_market_2022::good::good_kind::GoodKind;
     use unitn_market_2022::market::Market;
@@ -176,7 +182,7 @@ mod tests {
     fn test_apply_strategy_for_one_week() {
         let trader_name = "Test Trader".to_string();
         let (sgx, smse, tase, zse) = init_random_markets();
-        
+
         let mut trader = Trader::from(
             trader_name,
             StrategyIdentifier::Most_Simple,
@@ -184,7 +190,7 @@ mod tests {
             Rc::clone(&sgx),
             Rc::clone(&smse),
             Rc::clone(&tase),
-            Rc::clone(&zse)
+            Rc::clone(&zse),
         );
 
         dbg!(trader.get_history());

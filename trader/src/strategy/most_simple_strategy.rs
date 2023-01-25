@@ -47,7 +47,11 @@ impl MostSimpleStrategy {
 
         while tries < max_tries {
             // get cheapest price for current quantity
-            if let Ok(buy_price) = market.as_ref().borrow().get_buy_price(label.good_kind, tried_qty) {
+            if let Ok(buy_price) = market
+                .as_ref()
+                .borrow()
+                .get_buy_price(label.good_kind, tried_qty)
+            {
                 // is the price lower or equal to our maximum
                 if buy_price <= max_eur {
                     return Some((buy_price, tried_qty));
@@ -81,7 +85,12 @@ impl MostSimpleStrategy {
             .get_goods()
             .iter()
             .filter(|l| l.good_kind != DEFAULT_GOOD_KIND)
-            .map(|label| (label, self.find_adequate_bid(label, Rc::clone(&market), eur_qty)))
+            .map(|label| {
+                (
+                    label,
+                    self.find_adequate_bid(label, Rc::clone(&market), eur_qty),
+                )
+            })
             .filter(|(_, res)| res.is_some())
             .map(|(label, res)| {
                 let (price, qty) = res.unwrap();
@@ -101,10 +110,7 @@ impl MostSimpleStrategy {
     /// To get the cheapest good for a single market, its uses [`find_cheapest_good_from_market()`].
     ///
     /// The return value is (market name, (bid, Good to buy)).
-    fn find_cheapest_good(
-        &self,
-        eur_quantity: f32,
-    ) -> Option<(String, (f32, Good))> {
+    fn find_cheapest_good(&self, eur_quantity: f32) -> Option<(String, (f32, Good))> {
         if eur_quantity <= 0.0 {
             return None;
         }
@@ -163,21 +169,26 @@ impl MostSimpleStrategy {
         }
     }
 
-    fn get_mut_good_for_kind<'a>(&'a self, kind: GoodKind, inventory: &'a mut Vec<Good>) -> Option<&mut Good> {
+    fn get_mut_good_for_kind<'a>(
+        &'a self,
+        kind: GoodKind,
+        inventory: &'a mut Vec<Good>,
+    ) -> Option<&mut Good> {
         inventory.iter_mut().find(|g| g.get_kind() == kind)
     }
 
-    fn find_market_for_name(
-        &self,
-        name: &String,
-    ) -> Option<&MarketRef> {
+    fn find_market_for_name(&self, name: &String) -> Option<&MarketRef> {
         self.markets
             .iter()
             .find(|m| m.as_ref().borrow().get_name().to_string() == *name)
     }
 
     fn can_we_sell(&self, inventory: &Vec<Good>) -> bool {
-        inventory.iter().filter(|g| g.get_kind() != DEFAULT_GOOD_KIND).count() > 0
+        inventory
+            .iter()
+            .filter(|g| g.get_kind() != DEFAULT_GOOD_KIND)
+            .count()
+            > 0
     }
 
     fn find_highest_selling_market(&self, good: &Good, buy_price: f32) -> Option<(f32, String)> {
@@ -205,15 +216,13 @@ impl Strategy for MostSimpleStrategy {
         }
     }
 
-    fn apply(
-        &self,
-        goods: &mut Vec<Good>,
-        trader_name: &String,
-    ) {
+    fn apply(&self, goods: &mut Vec<Good>, trader_name: &String) {
         let mut buy_tokens = self.buy_tokens.borrow_mut();
         // this is our eur good (merge and split from this ref)
-        let mut eur_qty = self.get_mut_good_for_kind(GoodKind::EUR, goods).unwrap().get_qty(); // todo: Maybe better error handling, but eur is always there
-
+        let mut eur_qty = self
+            .get_mut_good_for_kind(GoodKind::EUR, goods)
+            .unwrap()
+            .get_qty(); // todo: Maybe better error handling, but eur is always there
 
         // 1. Find cheapest good to buy
         let cheapest_good = self.find_cheapest_good(eur_qty);
@@ -225,7 +234,8 @@ impl Strategy for MostSimpleStrategy {
 
             if market.get_name() == market_name {
                 // 2. Lock good to buy
-                let token = market.lock_buy(good.get_kind(), good.get_qty(), bid, trader_name.clone());
+                let token =
+                    market.lock_buy(good.get_kind(), good.get_qty(), bid, trader_name.clone());
                 if let Ok(token) = token {
                     buy_tokens.push((market_name.clone(), bid, token.clone()));
                 }
@@ -244,9 +254,11 @@ impl Strategy for MostSimpleStrategy {
             let mut cash = Good::new(GoodKind::EUR, *bid);
             if let Ok(bought_good) = market.buy(token.clone(), &mut cash) {
                 // todo Better error handling
-                let mut our_good = self.get_mut_good_for_kind(bought_good.get_kind(), goods).unwrap();
+                let mut our_good = self
+                    .get_mut_good_for_kind(bought_good.get_kind(), goods)
+                    .unwrap();
                 let _ = our_good.merge(bought_good.clone()); // TODO Check this: like in sell
-                // reduce our EURs with the buy price
+                                                             // reduce our EURs with the buy price
                 let mut our_eur = self.get_mut_good_for_kind(GoodKind::EUR, goods).unwrap();
                 let _ = our_eur.split(cash.get_qty());
                 // also add the buy to the buy history
@@ -257,7 +269,10 @@ impl Strategy for MostSimpleStrategy {
 
         // remove buy token
         for buy_token_history in bought_tokens {
-            let index = buy_tokens.iter().position(|t| *t == buy_token_history).unwrap();
+            let index = buy_tokens
+                .iter()
+                .position(|t| *t == buy_token_history)
+                .unwrap();
             buy_tokens.remove(index);
         }
 
@@ -271,13 +286,22 @@ impl Strategy for MostSimpleStrategy {
             }
 
             // Find the market with highest sell price
-            if let Some((sell_price, market_name)) = self.find_highest_selling_market(good, *buy_price) {
+            if let Some((sell_price, market_name)) =
+                self.find_highest_selling_market(good, *buy_price)
+            {
                 // found an adequate market, now need to lock the good
                 let market = self.find_market_for_name(&market_name).unwrap(); // todo error handling
                 let mut market = market.as_ref().borrow_mut();
-                if let Ok(token) = market.lock_sell(good.get_kind(), good.get_qty(), sell_price, trader_name.clone()) {
+                if let Ok(token) = market.lock_sell(
+                    good.get_kind(),
+                    good.get_qty(),
+                    sell_price,
+                    trader_name.clone(),
+                ) {
                     // successfully locked good for sell, add token with price to the sell token history
-                    self.sell_tokens.borrow_mut().push((market_name, good.clone(), token));
+                    self.sell_tokens
+                        .borrow_mut()
+                        .push((market_name, good.clone(), token));
                 }
             }
         }
@@ -299,7 +323,10 @@ impl Strategy for MostSimpleStrategy {
 
         // Remove old tokens that have been bought
         for sell_token_history in sold_tokens {
-            let index = sell_tokens.iter().position(|t| *t == sell_token_history).unwrap();
+            let index = sell_tokens
+                .iter()
+                .position(|t| *t == sell_token_history)
+                .unwrap();
             sell_tokens.remove(index);
         }
     }
@@ -307,19 +334,19 @@ impl Strategy for MostSimpleStrategy {
 
 #[cfg(test)]
 mod tests {
-    use std::borrow::Borrow;
     use crate::strategy::most_simple_strategy::MostSimpleStrategy;
     use crate::strategy::strategy::Strategy;
+    use crate::MarketRef;
     use smse::Smse;
+    use std::borrow::Borrow;
     use std::rc::Rc;
     use unitn_market_2022::good::consts::DEFAULT_GOOD_KIND;
     use unitn_market_2022::good::good::Good;
     use unitn_market_2022::good::good_kind::GoodKind;
     use unitn_market_2022::market::Market;
+    use SGX::market::sgx::SGX;
     use TASE::TASE;
     use ZSE::market::ZSE;
-    use SGX::market::sgx::SGX;
-    use crate::MarketRef;
 
     #[test]
     fn test_find_highest_selling_market_for_good() {
@@ -514,54 +541,60 @@ mod tests {
         }
     }*/
 
-        #[test]
-        fn test_find_cheapest_good() {
-            let quantity = 100_000.0;
-            let smse = Smse::new_with_quantities(quantity, quantity, quantity, quantity);
-            let tase = TASE::new_with_quantities(quantity, quantity, quantity, quantity);
-            let zse = ZSE::new_with_quantities(quantity, quantity, quantity, quantity);
-            let markets = Vec::from([Rc::clone(&smse), Rc::clone(&tase), Rc::clone(&zse)]);
+    #[test]
+    fn test_find_cheapest_good() {
+        let quantity = 100_000.0;
+        let smse = Smse::new_with_quantities(quantity, quantity, quantity, quantity);
+        let tase = TASE::new_with_quantities(quantity, quantity, quantity, quantity);
+        let zse = ZSE::new_with_quantities(quantity, quantity, quantity, quantity);
+        let markets = Vec::from([Rc::clone(&smse), Rc::clone(&tase), Rc::clone(&zse)]);
 
-            let strategy = MostSimpleStrategy::new(vec![Rc::clone(&smse), Rc::clone(&tase), Rc::clone(&zse)]);
+        let strategy =
+            MostSimpleStrategy::new(vec![Rc::clone(&smse), Rc::clone(&tase), Rc::clone(&zse)]);
 
-            // test with very high bid
-            let bid = 1_000_000.0;
-            let res = strategy.find_cheapest_good(bid);
-            assert_eq!(
-                true,
-                res.is_some(),
-                "For a high bid of {} something should be found",
-                bid
-            );
-            let (market_name, (price, good)) = res.unwrap();
-            assert_ne!(
-                DEFAULT_GOOD_KIND,
-                good.get_kind(),
-                "Found good can't be of kind {}",
-                DEFAULT_GOOD_KIND
-            );
-            assert!(
-                price <= bid,
-                "Cheapest price can't be higher than bid of {}",
-                bid
-            );
-            let cheapest_market = &markets
-                .iter()
-                .find(|m| m.as_ref().borrow().get_name() == market_name)
-                .unwrap();
-            let cheapest_price = cheapest_market
-                .borrow_mut()
-                .get_buy_price(good.get_kind(), good.get_qty())
-                .unwrap();
-            assert_eq!(
-                cheapest_price, price,
-                "Cheapest found price {} must be equal to the one of the market {}",
-                price, cheapest_price
-            );
+        // test with very high bid
+        let bid = 1_000_000.0;
+        let res = strategy.find_cheapest_good(bid);
+        assert_eq!(
+            true,
+            res.is_some(),
+            "For a high bid of {} something should be found",
+            bid
+        );
+        let (market_name, (price, good)) = res.unwrap();
+        assert_ne!(
+            DEFAULT_GOOD_KIND,
+            good.get_kind(),
+            "Found good can't be of kind {}",
+            DEFAULT_GOOD_KIND
+        );
+        assert!(
+            price <= bid,
+            "Cheapest price can't be higher than bid of {}",
+            bid
+        );
+        let cheapest_market = &markets
+            .iter()
+            .find(|m| m.as_ref().borrow().get_name() == market_name)
+            .unwrap();
+        let cheapest_price = cheapest_market
+            .borrow_mut()
+            .get_buy_price(good.get_kind(), good.get_qty())
+            .unwrap();
+        assert_eq!(
+            cheapest_price, price,
+            "Cheapest found price {} must be equal to the one of the market {}",
+            price, cheapest_price
+        );
 
-            // test with 0.0 as bid
-            let bid = 0.0;
-            let res = strategy.find_cheapest_good(bid);
-            assert_ne!(true, res.is_some(), "No good should be found for bid of {}", bid);
-        }
+        // test with 0.0 as bid
+        let bid = 0.0;
+        let res = strategy.find_cheapest_good(bid);
+        assert_ne!(
+            true,
+            res.is_some(),
+            "No good should be found for bid of {}",
+            bid
+        );
+    }
 }

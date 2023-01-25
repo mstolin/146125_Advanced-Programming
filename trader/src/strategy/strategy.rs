@@ -1,5 +1,5 @@
-use std::cell::RefCell;
 use crate::MarketRef;
+use std::cell::RefCell;
 use std::collections::HashMap;
 use unitn_market_2022::good::good::Good;
 
