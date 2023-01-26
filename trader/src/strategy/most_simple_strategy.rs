@@ -338,9 +338,21 @@ impl Strategy for MostSimpleStrategy {
         self.markets.borrow()
     }
 
-    fn sell_remaining_goods(&self) {
-        // TODO
-
+    fn sell_remaining_goods(&self, goods: &mut Vec<Good>, trader_name: &String) {
+        let mut eur = self.get_mut_good_for_kind(GoodKind::EUR, goods).unwrap();
+        let mut remaining_goods: Vec<&mut Good> = goods.iter_mut().filter(|g| g.get_kind() != GoodKind::EUR && g.get_qty() > 0.0).collect();
+        for good in remaining_goods {
+            if let Some((offer, market_name)) = self.find_highest_selling_market(good, 0.0) {
+                let market = self.find_market_for_name(&market_name).unwrap();
+                let mut market = market.as_ref().borrow_mut();
+                if let Ok(token) = market.lock_sell(good.get_kind(), good.get_qty(), offer, trader_name.clone()) {
+                    if let Ok(cash) = market.sell(token, good) {
+                        // todo this is redundant as in sell method like above
+                        let _ = eur.merge(cash); // todo handle the error
+                    }
+                }
+            }
+        }
     }
 
     fn apply(&self, goods: &mut Vec<Good>, trader_name: &String) {
