@@ -260,18 +260,15 @@ impl Strategy for MostSimpleStrategy {
             let market = self.find_market_for_name(market_name).unwrap();
             let mut market = market.as_ref().borrow_mut();
 
-            let mut cash = Good::new(GoodKind::EUR, *bid);
-            if let Ok(bought_good) = market.buy(token.clone(), &mut cash) {
+            //let mut cash = Good::new(GoodKind::EUR, *bid);
+            let mut our_eur = self.get_mut_good_for_kind(GoodKind::EUR, goods).unwrap();
+            if let Ok(bought_good) = market.buy(token.clone(), &mut our_eur) {
                 // todo Better error handling
                 let mut our_good = self
                     .get_mut_good_for_kind(bought_good.get_kind(), goods)
                     .unwrap();
                 let _ = our_good.merge(bought_good.clone()); // TODO Check this: like in sell
                                                              // reduce our EURs with the buy price
-                let mut our_eur = self.get_mut_good_for_kind(GoodKind::EUR, goods).unwrap();
-                println!("1. OUR EUR IS NOW {}", our_eur.get_qty());
-                let _ = our_eur.split(cash.get_qty());
-                println!("2. OUR EUR IS NOW {}", our_eur.get_qty());
                 // also add the buy to the buy history
                 self.buy_history.borrow_mut().push((*bid, bought_good));
                 bought_tokens.push(buy_token_history.clone());
