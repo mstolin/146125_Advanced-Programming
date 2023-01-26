@@ -1,14 +1,10 @@
-pub fn add(left: usize, right: usize) -> usize {
-    left + right
-}
+use std::cell::RefCell;
+use std::rc::Rc;
+use unitn_market_2022::market::Market;
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+pub mod strategy;
+mod tests;
+pub mod trader;
+mod consts;
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
-}
+type MarketRef = Rc<RefCell<dyn Market>>;

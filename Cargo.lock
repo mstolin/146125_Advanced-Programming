@@ -2161,6 +2161,7 @@ dependencies = [
  "SGX",
  "TASE",
  "ZSE",
+ "rand",
  "smse",
  "unitn_market_2022",
 ]
