@@ -218,10 +218,8 @@ impl Strategy for MostSimpleStrategy {
         }
     }
 
-    fn increase_day_by_one(&self) {
-        self.markets
-            .iter()
-            .for_each(|m| wait_one_day!(Rc::clone(m)));
+    fn get_markets(&self) -> &Vec<MarketRef> {
+        self.markets.borrow()
     }
 
     fn apply(&self, goods: &mut Vec<Good>, trader_name: &String) {
