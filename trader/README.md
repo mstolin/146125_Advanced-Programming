@@ -10,14 +10,12 @@ let sgx = SGX::new_random();
 let markets = Vec::from([Rc::clone(&sgx)]);
 
 let trader = Trader::from(
-    StrategyIdentifier::BuyAndHold,
-    300_000.0, // starting capital in EUR
-    markets
+    StrategyIdentifier::Most_Simple,
+    1_000_000.0,
+    markets,
 );
 
-while trader.get_days() < 24 { // run trader for 24 days (starts at 0)
-    trader.apply_strategy(30); // apply its strategy every 30 min
-}
+trader.apply_strategy(7, 30); // Run trader for 7 days, every 30 minutes
 
 let history = trader.get_history(); // get the history for further computations
 ```
@@ -27,7 +25,7 @@ let history = trader.get_history(); // get the history for further computations
 #### Step 1
 
 Create a new file with a meaningful name at `/src/strategy/YOUR_STRATEGY.rs`. Make your
-new strategy public and add it to `/src/strategy/mod.rs`, and implement the
+new strategy public, add it to `/src/strategy/mod.rs`, and implement the
 `Strategy` trait.
 
 ```rust
@@ -85,7 +83,7 @@ fn get_name_for_strategy(id: StrategyIdentifier) -> String {
 }
 ```
 
-Lastly, at `/src/trader/mod.rs` extent the `test_get_name_for_strategy` test
+Lastly, at `/src/trader/mod.rs` extend the `test_get_name_for_strategy` test
 case with your name:
 
 ```rust
