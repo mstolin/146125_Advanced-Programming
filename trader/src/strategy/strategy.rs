@@ -16,6 +16,11 @@ pub trait Strategy {
     fn apply(&self, goods: &mut Vec<Good>, trader_name: &String);
     /// Returns a reference to the markets used by this strategy.
     fn get_markets(&self) -> &Vec<MarketRef>;
+    /// At the end, we only want EURs in our inventory.
+    /// When the trader stops, it is possible that other goods than EUR
+    /// are still in the inventory. This method is supposed to be called
+    /// at the end of a trader run to sell all remaining goods **other than EUR**.
+    fn sell_remaining_goods(&self);
     /// Increases the day of all given markets by one day.
     ///
     /// Call this method in trader after a single day.

@@ -222,6 +222,11 @@ impl Strategy for MostSimpleStrategy {
         self.markets.borrow()
     }
 
+    fn sell_remaining_goods(&self) {
+        // TODO
+
+    }
+
     fn apply(&self, goods: &mut Vec<Good>, trader_name: &String) {
         let mut buy_tokens = self.buy_tokens.borrow_mut();
         // this is our eur good (merge and split from this ref)
