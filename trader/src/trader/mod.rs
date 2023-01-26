@@ -224,7 +224,7 @@ mod tests {
         );
 
         assert_eq!(0, trader.get_days(), "Trader should not have started now");
-        trader.apply_strategy(7, 30);
+        trader.apply_strategy(1, 60);
         assert_eq!(7, trader.get_days(), "Trader must have been running for 7 days");
 
         // todo Check if all goods except EUR is 0 (Is it possible to check this?)
