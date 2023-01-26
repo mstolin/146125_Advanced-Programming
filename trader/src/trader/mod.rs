@@ -56,10 +56,6 @@ impl Trader {
             panic!("start_capital must be greater than 0.0")
         }
 
-        // All markets must subscribe to each other
-        // todo this will throw an error
-        // subscribe_each_other!(Rc::clone(&sgx), Rc::clone(&smse), Rc::clone(&tase), Rc::clone(&zse));
-
         // init default goods
         let goods = Self::create_goods(start_capital);
         let history = RefCell::new(Vec::from([goods.clone()]));
@@ -96,14 +92,14 @@ impl Trader {
             self.strategy
                 .borrow_mut()
                 .apply(&mut self.goods.borrow_mut(), &self.name);
+            // add updated goods after strategy has been applied
+            self.history.borrow_mut().push(self.goods.borrow().clone());
         }
 
         // lastly increase day
         let mut days = self.days.borrow_mut();
         *days += 1;
         self.strategy.borrow().increase_day_by_one();
-        // add updated goods after one day to the history
-        self.history.borrow_mut().push(self.goods.borrow().clone());
     }
 
     /// Returns the number of days the agent is running
