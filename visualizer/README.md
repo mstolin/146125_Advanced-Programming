@@ -18,7 +18,7 @@
 >  `let ops = vec![(0, 10.0),(3, 42.1),(2, 37.4)];`
 >  `save(&ops,"save_test");`
 > This is sufficient to create a file named save_test.json, which can be read by the visualizer.\
-> The created file can be found in this path :
+> The created file can be found in this path : \
 ![Screenshot (143)](https://user-images.githubusercontent.com/94851163/214957111-3d700500-1b32-47a9-93d7-1cee048594d2.png)
 
 > ### P.S
