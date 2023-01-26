@@ -179,6 +179,14 @@ impl MostSimpleStrategy {
         inventory.iter_mut().find(|g| g.get_kind() == kind)
     }
 
+    fn get_good_for_kind<'a>(
+        &'a self,
+        kind: GoodKind,
+        inventory: &'a Vec<Good>,
+    ) -> Option<&Good> {
+        inventory.iter().find(|g| g.get_kind() == kind)
+    }
+
     fn find_market_for_name(&self, name: &String) -> Option<&MarketRef> {
         self.markets
             .iter()
@@ -206,38 +214,14 @@ impl MostSimpleStrategy {
         }
         None
     }
-}
 
-impl Strategy for MostSimpleStrategy {
-    fn new(markets: Vec<MarketRef>) -> Self {
-        Self {
-            buy_tokens: RefCell::new(Vec::new()),
-            buy_history: RefCell::new(Vec::new()),
-            sell_tokens: RefCell::new(Vec::new()),
-            markets,
-        }
-    }
-
-    fn get_markets(&self) -> &Vec<MarketRef> {
-        self.markets.borrow()
-    }
-
-    fn sell_remaining_goods(&self) {
-        // TODO
-
-    }
-
-    fn apply(&self, goods: &mut Vec<Good>, trader_name: &String) {
+    fn lock_cheapest_good_for_buy(&self, inventory: &Vec<Good>, trader_name: &String) {
         let mut buy_tokens = self.buy_tokens.borrow_mut();
-        // this is our eur good (merge and split from this ref)
-        let mut eur_qty = self
-            .get_mut_good_for_kind(GoodKind::EUR, goods)
-            .unwrap()
-            .get_qty(); // todo: Maybe better error handling, but eur is always there
-
         // 1. Find cheapest good to buy
+        let mut eur_qty = self
+            .get_good_for_kind(GoodKind::EUR, inventory)
+            .unwrap().get_qty();
         let cheapest_good = self.find_cheapest_good(eur_qty);
-
         // 2. If a cheapest good has been found, try to lock it
         if let Some((market_name, (bid, good))) = cheapest_good {
             let market = self.find_market_for_name(&market_name).unwrap();
@@ -252,30 +236,30 @@ impl Strategy for MostSimpleStrategy {
                 }
             }
         }
+    }
 
-        // 3. Buy every locked good
+    fn buy_locked_goods(&self, inventory: &mut Vec<Good>) {
+        let mut buy_tokens = self.buy_tokens.borrow_mut();
         let mut bought_tokens: Vec<BuyTokenHistory> = Vec::new();
         for buy_token_history in buy_tokens.iter_mut() {
             let (market_name, bid, token) = buy_token_history;
             let market = self.find_market_for_name(market_name).unwrap();
             let mut market = market.as_ref().borrow_mut();
 
-            //let mut cash = Good::new(GoodKind::EUR, *bid);
-            let mut our_eur = self.get_mut_good_for_kind(GoodKind::EUR, goods).unwrap();
-            if let Ok(bought_good) = market.buy(token.clone(), &mut our_eur) {
+            let mut eur = self.get_mut_good_for_kind(GoodKind::EUR, inventory).unwrap();
+            if let Ok(bought_good) = market.buy(token.clone(), eur) {
                 // todo Better error handling
                 let mut our_good = self
-                    .get_mut_good_for_kind(bought_good.get_kind(), goods)
+                    .get_mut_good_for_kind(bought_good.get_kind(), inventory)
                     .unwrap();
                 let _ = our_good.merge(bought_good.clone()); // TODO Check this: like in sell
-                                                             // reduce our EURs with the buy price
                 // also add the buy to the buy history
                 self.buy_history.borrow_mut().push((*bid, bought_good));
                 bought_tokens.push(buy_token_history.clone());
             }
         }
 
-        // remove buy token
+        // remove bought tokens todo own method
         for buy_token_history in bought_tokens {
             let index = buy_tokens
                 .iter()
@@ -283,10 +267,9 @@ impl Strategy for MostSimpleStrategy {
                 .unwrap();
             buy_tokens.remove(index);
         }
+    }
 
-        // ## SELL
-
-        // 1. Lock
+    fn lock_goods_for_sell(&self, trader_name: &String) {
         for (buy_price, good) in self.buy_history.borrow().iter() {
             // Do not sell EUR
             if good.get_kind() == DEFAULT_GOOD_KIND {
@@ -313,8 +296,9 @@ impl Strategy for MostSimpleStrategy {
                 }
             }
         }
+    }
 
-        // 2. Actually sell
+    fn sell_locked_goods(&self, inventory: &mut Vec<Good>) {
         let mut sold_tokens: Vec<SellTokenHistory> = Vec::new();
         let mut sell_tokens = self.sell_tokens.borrow_mut();
         for sell_token_history in sell_tokens.iter_mut() {
@@ -323,8 +307,8 @@ impl Strategy for MostSimpleStrategy {
             let mut market = market.as_ref().borrow_mut();
 
             if let Ok(cash) = market.sell(token.clone(), good) {
-                let mut our_eur = self.get_mut_good_for_kind(GoodKind::EUR, goods).unwrap();
-                let _ = our_eur.merge(cash); // todo handle the error
+                let mut eur = self.get_mut_good_for_kind(GoodKind::EUR, inventory).unwrap();
+                let _ = eur.merge(cash); // todo handle the error
                 sold_tokens.push(sell_token_history.clone());
             }
         }
@@ -337,6 +321,33 @@ impl Strategy for MostSimpleStrategy {
                 .unwrap();
             sell_tokens.remove(index);
         }
+    }
+}
+
+impl Strategy for MostSimpleStrategy {
+    fn new(markets: Vec<MarketRef>) -> Self {
+        Self {
+            buy_tokens: RefCell::new(Vec::new()),
+            buy_history: RefCell::new(Vec::new()),
+            sell_tokens: RefCell::new(Vec::new()),
+            markets,
+        }
+    }
+
+    fn get_markets(&self) -> &Vec<MarketRef> {
+        self.markets.borrow()
+    }
+
+    fn sell_remaining_goods(&self) {
+        // TODO
+
+    }
+
+    fn apply(&self, goods: &mut Vec<Good>, trader_name: &String) {
+        self.lock_cheapest_good_for_buy(goods, &trader_name); // 1. Lock buy the cheapest good we can find
+        self.buy_locked_goods(goods); // 2. Buy all locked goods // todo eur and goods is kinda redundant
+        self.lock_goods_for_sell(trader_name); // 3. Lock sell all goods for a higher price
+        self.sell_locked_goods(goods); // 4. Sell our goods
     }
 }
 
