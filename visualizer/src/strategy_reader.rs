@@ -31,7 +31,7 @@ pub fn save(activities : &[(i32,f64)],filename : &str){
     let json_ops = serde_json::to_string(&balances).unwrap();
 
     //need to change filepath after merge to main
-    let mut file = File::create(format!("src/trades/{filename}.json")).expect("Could not save");
+    let mut file = File::create(format!("visualizer/src/trades/{filename}.json")).expect("Could not save");
     file.write_all(json_ops.as_bytes()).unwrap();
 }
 
@@ -39,14 +39,14 @@ pub fn save(activities : &[(i32,f64)],filename : &str){
 /// # File reader
 /// * `path` - The location of the strategy's log
 pub(crate) fn read(filename :&str) -> Result<Vec<Balance>,serde_json::Error>{
-    let path = format!("src/trades/{filename}");
+    let path = format!("visualizer/src/trades/{filename}");
     let file = File::open(path).expect("File not found in the folder src/trades");
     serde_json::from_reader(file)
 }
 
 
 pub(crate) fn find_all_available() -> Vec<String>{
-    let directory = "src/trades";
+    let directory = "visualizer/src/trades";
     let mut strategies = vec![];
     let saved_files = fs::read_dir(directory).expect("Nothing was found");
     for file in saved_files{

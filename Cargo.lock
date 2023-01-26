@@ -2316,6 +2316,8 @@ dependencies = [
  "druid",
  "plotters",
  "plotters-druid",
+ "serde",
+ "serde_json",
  "smse",
  "unitn_market_2022",
 ]
