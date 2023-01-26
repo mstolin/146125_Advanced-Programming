@@ -87,8 +87,11 @@ impl Trader {
     /// It simulates minutes by calculating how many times the strategy has to be
     /// applied for a using *t = 24 * 60 / n* where *n* is defined as mentioned above.
     /// Then, it applies the strategy exactly *t* times.
-    pub fn apply_strategy(&self, apply_every_minutes: u32) {
-        // todo: Interior mut, no need that this method is mut
+    pub fn apply_strategy(&self, max_days: u32, apply_every_minutes: u32) {
+        if max_days <= 1 {
+            panic!("The trader has to run at least 1 day ({} max. days given)", max_days);
+        }
+
         let minutes_per_day: u32 = 24 * 60;
         if apply_every_minutes > minutes_per_day {
             panic!(
@@ -96,21 +99,27 @@ impl Trader {
                 minutes_per_day
             )
         }
-
         // how many times to apply the strategy per day?
         let interval_times = minutes_per_day / apply_every_minutes;
-        for _ in 0..interval_times {
-            self.strategy
-                .borrow_mut()
-                .apply(&mut self.goods.borrow_mut(), &self.name);
-            // add updated goods after strategy has been applied
-            self.history.borrow_mut().push(self.goods.borrow().clone());
+        // safe days
+        let mut days = self.days.borrow_mut();
+
+        // run the trader
+        while (*days) < max_days {
+            for _ in 0..interval_times {
+                self.strategy
+                    .borrow_mut()
+                    .apply(&mut self.goods.borrow_mut(), &self.name);
+                // add updated goods after strategy has been applied
+                self.history.borrow_mut().push(self.goods.borrow().clone());
+            }
+            // lastly increase day
+            *days += 1;
+            self.strategy.borrow().increase_day_by_one();
         }
 
-        // lastly increase day
-        let mut days = self.days.borrow_mut();
-        *days += 1;
-        self.strategy.borrow().increase_day_by_one();
+        // now sell all remaining goods
+        self.strategy.borrow().sell_remaining_goods();
     }
 
     /// Returns the number of days the agent is running
@@ -144,7 +153,7 @@ mod tests {
         let smse = Smse::new_random();
         let tase = TASE::new_random();
         let zse = ZSE::new_random();
-        //subscribe_each_other!(&sgx, &smse, &tase, &zse);
+        //subscribe_each_other!(&sgx, &smse, &tase, &zse); // todo fix this
         (sgx, smse, tase, zse)
     }
 
@@ -208,16 +217,16 @@ mod tests {
             Rc::clone(&zse),
         ];
 
-        let mut trader = Trader::from(
+        let trader = Trader::from(
             StrategyIdentifier::Most_Simple,
             1_000_000.0,
             markets,
         );
 
-        while trader.get_days() < 7 {
-            trader.apply_strategy(30);
-        }
+        assert_eq!(0, trader.get_days(), "Trader should not have started now");
+        trader.apply_strategy(7, 30);
+        assert_eq!(7, trader.get_days(), "Trader must have been running for 7 days");
 
-        dbg!(trader.get_history());
+        // todo Check if all goods except EUR is 0 (Is it possible to check this?)
     }
 }
