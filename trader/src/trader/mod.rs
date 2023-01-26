@@ -108,22 +108,24 @@ impl Trader {
 
         // run the trader
         while (*days) < max_days {
+            // apply strategy every n minutes
             for _ in 0..interval_times {
                 self.strategy
                     .borrow_mut()
                     .apply(&mut self.goods.borrow_mut());
-                // add updated goods after strategy has been applied
-                self.history.borrow_mut().push(self.goods.borrow().clone());
             }
-            // lastly increase day
+
+            // increase day
             *days += 1;
             self.strategy.borrow().increase_day_by_one();
 
+            // if its the last day, sell all remaining goods
             if *days >= max_days {
-                // its the last day, sell all remaining goods
                 self.strategy.borrow().sell_remaining_goods(&mut self.goods.borrow_mut());
-                // todo how to push to history now?
             }
+
+            // add updated goods to history after strategy has been applied
+            self.history.borrow_mut().push(self.goods.borrow().clone());
         }
     }
 
