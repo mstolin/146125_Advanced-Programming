@@ -42,10 +42,11 @@ impl Trader {
     fn init_strategy(
         id: StrategyIdentifier,
         markets: Vec<MarketRef>,
-    ) -> RefCell<Box<dyn Strategy>> {
+        trader_name: &String
+    ) -> Box<dyn Strategy> {
         match id {
             StrategyIdentifier::Most_Simple => {
-                RefCell::new(Box::new(MostSimpleStrategy::new(markets)))
+                Box::new(MostSimpleStrategy::new(markets, trader_name))
             }
         }
     }
@@ -69,14 +70,15 @@ impl Trader {
 
         // init default goods
         let name = Self::get_name_for_strategy(StrategyIdentifier::Most_Simple);
+        let strategy = Self::init_strategy(strategyId, markets, &name);
         let goods = Self::create_goods(start_capital);
-        let history = RefCell::new(Vec::from([goods.clone()]));
+        let history = Vec::from([goods.clone()]);
 
         Self {
             name,
-            strategy: Self::init_strategy(strategyId, markets),
+            strategy: RefCell::new(strategy),
             goods: RefCell::new(goods),
-            history,
+            history: RefCell::new(history),
             days: RefCell::new(0),
         }
     }
@@ -106,20 +108,25 @@ impl Trader {
 
         // run the trader
         while (*days) < max_days {
+            // apply strategy every n minutes
             for _ in 0..interval_times {
                 self.strategy
                     .borrow_mut()
-                    .apply(&mut self.goods.borrow_mut(), &self.name);
-                // add updated goods after strategy has been applied
-                self.history.borrow_mut().push(self.goods.borrow().clone());
+                    .apply(&mut self.goods.borrow_mut());
             }
-            // lastly increase day
+
+            // increase day
             *days += 1;
             self.strategy.borrow().increase_day_by_one();
-        }
 
-        // now sell all remaining goods
-        self.strategy.borrow().sell_remaining_goods(&mut self.goods.borrow_mut(), &self.name);
+            // if its the last day, sell all remaining goods
+            if *days >= max_days {
+                self.strategy.borrow().sell_remaining_goods(&mut self.goods.borrow_mut());
+            }
+
+            // add updated goods to history after strategy has been applied
+            self.history.borrow_mut().push(self.goods.borrow().clone());
+        }
     }
 
     /// Returns the number of days the agent is running
@@ -224,8 +231,7 @@ mod tests {
         );
 
         assert_eq!(0, trader.get_days(), "Trader should not have started now");
-        trader.apply_strategy(1, 60);
-        dbg!(trader.get_history());
+        trader.apply_strategy(7, 30);
         assert_eq!(7, trader.get_days(), "Trader must have been running for 7 days");
 
         // todo Check if all goods except EUR is 0 (Is it possible to check this?)
