@@ -119,7 +119,7 @@ impl Trader {
         }
 
         // now sell all remaining goods
-        self.strategy.borrow().sell_remaining_goods();
+        self.strategy.borrow().sell_remaining_goods(&mut self.goods.borrow_mut(), &self.name);
     }
 
     /// Returns the number of days the agent is running
@@ -225,6 +225,7 @@ mod tests {
 
         assert_eq!(0, trader.get_days(), "Trader should not have started now");
         trader.apply_strategy(1, 60);
+        dbg!(trader.get_history());
         assert_eq!(7, trader.get_days(), "Trader must have been running for 7 days");
 
         // todo Check if all goods except EUR is 0 (Is it possible to check this?)
