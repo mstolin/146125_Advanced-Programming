@@ -10,10 +10,6 @@ pub trait Strategy {
     fn new(markets: Vec<MarketRef>) -> Self
     where
         Self: Sized;
-    /// This methods applies the implemented strategy on the given goods.
-    ///
-    /// It sells goods from the given inventory.
-    fn apply(&self, goods: &mut Vec<Good>, trader_name: &String);
     /// Returns a reference to the markets used by this strategy.
     fn get_markets(&self) -> &Vec<MarketRef>;
     /// At the end, we only want EURs in our inventory.
@@ -29,4 +25,8 @@ pub trait Strategy {
             .iter()
             .for_each(|m| wait_one_day!(Rc::clone(m)));
     }
+    /// This methods applies the implemented strategy on the given goods.
+    ///
+    /// It sells goods from the given inventory.
+    fn apply(&self, goods: &mut Vec<Good>, trader_name: &String);
 }
