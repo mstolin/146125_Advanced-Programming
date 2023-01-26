@@ -9,6 +9,7 @@ use unitn_market_2022::good::good::Good;
 use unitn_market_2022::good::good_kind::GoodKind;
 use unitn_market_2022::market::Market;
 use unitn_market_2022::{subscribe_each_other, wait_one_day};
+use crate::consts::TRADER_NAME_MOST_SIMPLE;
 
 enum StrategyIdentifier {
     Most_Simple,
@@ -25,7 +26,10 @@ struct Trader {
 }
 
 impl Trader {
-    /// Creates a vec with all available goods
+    /// Creates a vec with all available goods (EUR, USD, YEN, YUAN).
+    /// By default, all goods have a quantity of 0.0. Except EUR, that
+    /// starts with the given default quantity that is initially defined
+    /// in [`from`](from).
     fn create_goods(default_quantity: f32) -> Vec<Good> {
         let eur = Good::new(GoodKind::EUR, default_quantity);
         let usd = Good::new(GoodKind::USD, 0.0);
@@ -34,6 +38,7 @@ impl Trader {
         Vec::from([eur, usd, yen, yuan])
     }
 
+    /// Inits the strategy for the given identifier.
     fn init_strategy(
         id: StrategyIdentifier,
         markets: Vec<MarketRef>,
@@ -45,9 +50,15 @@ impl Trader {
         }
     }
 
+    /// Returns the name of the trader for the given strategy identifier.
+    fn get_name_for_strategy(id: StrategyIdentifier) -> String {
+        match id {
+            StrategyIdentifier::Most_Simple => TRADER_NAME_MOST_SIMPLE.to_string(),
+        }
+    }
+
     /// Instantiates a trader
     pub fn from(
-        name: String,
         strategyId: StrategyIdentifier,
         start_capital: f32,
         markets: Vec<MarketRef>,
@@ -57,9 +68,9 @@ impl Trader {
         }
 
         // init default goods
+        let name = Self::get_name_for_strategy(StrategyIdentifier::Most_Simple);
         let goods = Self::create_goods(start_capital);
         let history = RefCell::new(Vec::from([goods.clone()]));
-        //let markets = vec![sgx, smse, tase, zse];
 
         Self {
             name,
@@ -126,6 +137,7 @@ mod tests {
     use SGX::market::sgx::SGX;
     use TASE::TASE;
     use ZSE::market::ZSE;
+    use crate::consts::TRADER_NAME_MOST_SIMPLE;
 
     fn init_random_markets() -> (MarketRef, MarketRef, MarketRef, MarketRef) {
         let sgx = SGX::new_random();
@@ -139,14 +151,35 @@ mod tests {
     #[test]
     fn test_new_trader() {
         let (sgx, smse, tase, zse) = init_random_markets();
-        let markets = vec![sgx, smse, tase, zse];
+        let markets = vec![
+            Rc::clone(&sgx),
+            Rc::clone(&smse),
+            Rc::clone(&tase),
+            Rc::clone(&zse),
+        ];
         let trader = Trader::from(
-            "TEST_TRADER".to_string(),
             StrategyIdentifier::Most_Simple,
             300_000.0,
             markets,
         );
-        assert_eq!(4, trader.goods.borrow().len());
+        let trader_name = Trader::get_name_for_strategy(StrategyIdentifier::Most_Simple);
+        assert_eq!(trader_name, trader.name, "Trader name must be equal to {}", trader_name);
+        assert_eq!(4, trader.goods.borrow().len(), "The trader should not have more than 4 goods");
+        assert_eq!(0, trader.get_days(), "The trader was not running yet");
+        assert_eq!(1, trader.history.borrow().len(), "The length of the history can't be bigger than 1.");
+    }
+
+    #[test]
+    fn test_get_name_for_strategy() {
+        let possible_strategies = [
+            (StrategyIdentifier::Most_Simple, TRADER_NAME_MOST_SIMPLE),
+        ];
+
+        for (id, value) in possible_strategies {
+            let name = Trader::get_name_for_strategy(id);
+            let value = value.to_string();
+            assert_eq!(value, name, "Name should be equal to constant ({})", value);
+        }
     }
 
     #[test]
@@ -167,9 +200,7 @@ mod tests {
 
     #[test]
     fn test_apply_strategy_for_one_week() {
-        let trader_name = "Test Trader".to_string();
         let (sgx, smse, tase, zse) = init_random_markets();
-        //let markets = vec![sgx, smse, tase, zse];
         let markets = vec![
             Rc::clone(&sgx),
             Rc::clone(&smse),
@@ -178,7 +209,6 @@ mod tests {
         ];
 
         let mut trader = Trader::from(
-            trader_name,
             StrategyIdentifier::Most_Simple,
             1_000_000.0,
             markets,
