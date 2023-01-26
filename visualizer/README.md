@@ -15,11 +15,12 @@
 
 # Example :
 > The following code is an example of how to use the visualizer.\
->  `let ops = vec![(0, 10.0),(3, 42.1),(2, 37.4)];
-save(&ops,"save_test");`
+>  `let ops = vec![(0, 10.0),(3, 42.1),(2, 37.4)];`
+>  `save(&ops,"save_test");`
 > This is sufficient to create a file named save_test.json, which can be read by the visualizer.\
 > The created file can be found in this path :
-<img src="C:\Users\Farid\OneDrive\Immagini\Catture di schermata\Screenshot (143).png">
+![Screenshot (143)](https://user-images.githubusercontent.com/94851163/214957111-3d700500-1b32-47a9-93d7-1cee048594d2.png)
+
 > ### P.S
 > For now the visualizer can only read one file at a time, I haven't implemented an effective way to change the selected file to read. 
 > You can stay assured the usage is correct if you can manage to create a json file with the correct format. 
@@ -29,6 +30,7 @@ save(&ops,"save_test");`
 
 # Result :
 ### Something similar should appear, showing the data on a widget : 
- <img src="C:\Users\Farid\OneDrive\Immagini\Catture di schermata\Screenshot (142).png" width = 1000 >
+![Screenshot (142)](https://user-images.githubusercontent.com/94851163/214956949-706e0037-4092-49ee-bd4e-fd637716102f.png)
+
 > From file "balances.json" 
 
