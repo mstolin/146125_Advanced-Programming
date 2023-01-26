@@ -88,7 +88,7 @@ impl Trader {
     /// applied for a using *t = 24 * 60 / n* where *n* is defined as mentioned above.
     /// Then, it applies the strategy exactly *t* times.
     pub fn apply_strategy(&self, max_days: u32, apply_every_minutes: u32) {
-        if max_days <= 1 {
+        if max_days < 1 {
             panic!("The trader has to run at least 1 day ({} max. days given)", max_days);
         }
 
