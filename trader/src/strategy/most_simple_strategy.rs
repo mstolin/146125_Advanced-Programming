@@ -6,7 +6,6 @@ use std::borrow::{Borrow, BorrowMut};
 use std::cell::{Cell, Ref, RefCell, RefMut};
 use std::ops::Index;
 use std::rc::Rc;
-use unitn_market_2022::good::consts::DEFAULT_GOOD_KIND;
 use unitn_market_2022::good::good::Good;
 use unitn_market_2022::good::good_kind::GoodKind;
 use unitn_market_2022::market::good_label::GoodLabel;
@@ -96,21 +95,23 @@ impl MostSimpleStrategy {
             })
             .filter(|(_, res)| res.is_some())
             .map(|(label, res)| {
-                let (price, qty) = res.unwrap();
-                (price, Good::new(label.good_kind, qty))
+                let (bid, qty) = res.unwrap();
+                (bid, Good::new(label.good_kind, qty))
             })
-            .reduce(|(price_a, good_a), (price_b, good_b)| {
+            .reduce(|(bid_a, good_a), (bid_b, good_b)| {
                 if good_a.get_qty() > good_b.get_qty() {
-                    (price_a, good_a)
+                    (bid_a, good_a)
                 } else {
-                    (price_b, good_b)
+                    (bid_b, good_b)
                 }
             })
     }
 
     /// This method tries to find the cheapest good from all markets for the given max. EUR
     /// quantity.
-    /// To get the cheapest good for a single market, its uses [`find_cheapest_good_from_market()`].
+    /// To get the cheapest good for a single market, it uses the
+    /// [`find_cheapest_good_from_market()`] method. For comparison, it prefers the good with the
+    /// lowest bid.
     ///
     /// The return value is (market name, (bid, Good to buy)).
     fn find_cheapest_good(&self, eur_quantity: f32) -> Option<(String, (f32, Good))> {
@@ -129,38 +130,42 @@ impl MostSimpleStrategy {
             })
             .filter(|(m, res)| res.is_some())
             .map(|(m, res)| (m, (res.unwrap())))
-            .reduce(|(m_a, (price_a, good_a)), (m_b, (price_b, good_b))| {
-                if good_a.get_qty() > good_b.get_qty() {
-                    (m_a, (price_a, good_a))
+            .reduce(|(m_a, (bid_a, good_a)), (m_b, (bid_b, good_b))| {
+                // returns the cheapest good
+                if bid_a < bid_b {
+                    (m_a, (bid_a, good_a))
                 } else {
-                    (m_b, (price_b, good_b))
+                    (m_b, (bid_b, good_b))
                 }
             })
     }
 
-    /// Returns the highest selling market + price for the bought good
+    /// This method tries to find the highest selling market for the given good.
+    ///
+    /// It first checks if the offer of the market is at least higher than the buy
+    /// price. Then, it returns the market with the highest offer.
     fn find_highest_selling_market_for_good<'a>(
         &'a self,
         good: &'a Good,
         buy_price: f32,
-    ) -> Option<(&str, f32)> {
+    ) -> Option<(String, f32)> {
         self.markets
             .iter()
             .map(|m| m.as_ref().borrow())
             .map(|m| {
                 (
-                    m.get_name(),
+                    m.get_name().to_string(),
                     m.get_sell_price(good.get_kind(), good.get_qty()),
                 )
             })
-            .filter(|(_, price)| price.is_ok())
-            .map(|(name, price)| (name, price.unwrap()))
+            .filter(|(_, offer)| offer.is_ok())
+            .map(|(name, offer)| (name, offer.unwrap()))
             .filter(|(_, sell_price)| *sell_price > buy_price)
-            .reduce(|(market_a, price_a), (market_b, price_b)| {
-                if price_a > price_b {
-                    (market_a, price_a)
+            .reduce(|(market_a, offer_a), (market_b, offer_b)| {
+                if offer_a > offer_b { // todo: WHY IS THE MARKET MORE EFFECTIVE IF offer_a < offer_b ???
+                    (market_a, offer_a)
                 } else {
-                    (market_b, price_b)
+                    (market_b, offer_b)
                 }
             })
     }
@@ -200,20 +205,6 @@ impl MostSimpleStrategy {
             .filter(|g| g.get_kind() != DEFAULT_GOOD_KIND)
             .count()
             > 0
-    }
-
-    fn find_highest_selling_market(&self, good: &Good, buy_price: f32) -> Option<(f32, String)> {
-        for market in &self.markets {
-            let market = Rc::clone(market);
-            let market = market.as_ref().borrow();
-            if let Ok(sell_price) = market.get_sell_price(good.get_kind(), good.get_qty()) {
-                if sell_price > buy_price {
-                    // sell price is bigger than our buy price
-                    return Some((sell_price, market.get_name().to_string()));
-                }
-            }
-        }
-        None
     }
 
     fn lock_cheapest_good_for_buy(&self, inventory: &Vec<Good>) {
@@ -278,8 +269,8 @@ impl MostSimpleStrategy {
             }
 
             // Find the market with highest sell price
-            if let Some((sell_price, market_name)) =
-                self.find_highest_selling_market(good, *buy_price)
+            if let Some((market_name, sell_price)) =
+                self.find_highest_selling_market_for_good(good, *buy_price)
             {
                 // found an adequate market, now need to lock the good
                 let market = self.find_market_for_name(&market_name).unwrap(); // todo error handling
@@ -346,7 +337,7 @@ impl Strategy for MostSimpleStrategy {
             if good.get_kind() == GoodKind::EUR || good.get_qty() == 0.0 {
                 continue;
             }
-            if let Some((offer, market_name)) = self.find_highest_selling_market(good, 0.0) {
+            if let Some((market_name, offer)) = self.find_highest_selling_market_for_good(good, 0.0) {
                 let market = self.find_market_for_name(&market_name).unwrap();
                 let mut market = market.as_ref().borrow_mut();
                 if let Ok(token) = market.lock_sell(good.get_kind(), good.get_qty(), offer, self.trader_name.clone()) {
