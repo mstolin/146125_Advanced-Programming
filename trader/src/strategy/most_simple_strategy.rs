@@ -144,9 +144,9 @@ impl MostSimpleStrategy {
     ///
     /// It first checks if the offer of the market is at least higher than the buy
     /// price. Then, it returns the market with the highest offer.
-    fn find_highest_selling_market_for_good<'a>(
-        &'a self,
-        good: &'a Good,
+    fn find_highest_selling_market_for_good(
+        &self,
+        good: &Good,
         buy_price: f32,
     ) -> Option<(String, f32)> {
         self.markets
