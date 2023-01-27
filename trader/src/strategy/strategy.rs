@@ -1,15 +1,15 @@
 use crate::MarketRef;
 use std::cell::RefCell;
-use std::rc::Rc;
 use std::collections::HashMap;
+use std::rc::Rc;
 use unitn_market_2022::good::good::Good;
 use unitn_market_2022::wait_one_day;
 
 pub trait Strategy {
     /// Constructs a new trading strategy that works with the given markets.
     fn new(markets: Vec<MarketRef>, trader_name: &String) -> Self
-        where
-            Self: Sized;
+    where
+        Self: Sized;
     /// Returns a reference to the markets used by this strategy.
     fn get_markets(&self) -> &Vec<MarketRef>;
     /// Increases the day of all given markets by one day.
