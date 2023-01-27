@@ -38,7 +38,7 @@ impl MostSimpleStrategy {
         //market: &Ref<dyn Market>,
         max_eur: f32,
     ) -> Option<(f32, f32)> {
-        if label.good_kind == DEFAULT_GOOD_KIND {
+        if label.good_kind == GoodKind::EUR {
             // Its not smart to buy eur for eur
             return None;
         }
@@ -86,7 +86,7 @@ impl MostSimpleStrategy {
             .borrow()
             .get_goods()
             .iter()
-            .filter(|l| l.good_kind != DEFAULT_GOOD_KIND)
+            .filter(|l| l.good_kind != GoodKind::EUR)
             .map(|label| {
                 (
                     label,
@@ -171,7 +171,7 @@ impl MostSimpleStrategy {
     }
 
     fn increase_eur_qty(&self, goods: &mut Vec<Good>, merge_eur: Good) {
-        let eur = goods.iter_mut().find(|g| g.get_kind() == DEFAULT_GOOD_KIND);
+        let eur = goods.iter_mut().find(|g| g.get_kind() == GoodKind::EUR);
         if let Some(eur) = eur {
             let _ = eur.merge(merge_eur);
         }
@@ -202,7 +202,7 @@ impl MostSimpleStrategy {
     fn can_we_sell(&self, inventory: &Vec<Good>) -> bool {
         inventory
             .iter()
-            .filter(|g| g.get_kind() != DEFAULT_GOOD_KIND)
+            .filter(|g| g.get_kind() != GoodKind::EUR)
             .count()
             > 0
     }
@@ -264,7 +264,7 @@ impl MostSimpleStrategy {
     fn lock_goods_for_sell(&self) {
         for (buy_price, good) in self.buy_history.borrow().iter() {
             // Do not sell EUR
-            if good.get_kind() == DEFAULT_GOOD_KIND {
+            if good.get_kind() == GoodKind::EUR {
                 continue;
             }
 
