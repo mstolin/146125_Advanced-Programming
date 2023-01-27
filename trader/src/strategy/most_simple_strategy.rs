@@ -13,15 +13,24 @@ use unitn_market_2022::market::Market;
 use unitn_market_2022::wait_one_day;
 
 type BuyTokenHistory = (String, f32, String); // (market name, bid, buy token)
-type SellTokenHistory = (String, Good, String); // (market name, locked good, buy token)
+type SellTokenHistory = (String, Good, String); // (market name, locked good, sell token)
 type GoodHistory = (f32, Good); // (eur price, bought good with bought quantity)
 
 pub struct MostSimpleStrategy {
+    /// Name of the trader using this strategy
     trader_name: String,
-    buy_tokens: RefCell<Vec<BuyTokenHistory>>,
-    buy_history: RefCell<Vec<GoodHistory>>,
-    sell_tokens: RefCell<Vec<SellTokenHistory>>,
+    /// All markets this strategy works with
     markets: Vec<MarketRef>,
+    /// Storage for buy tokens
+    buy_tokens: RefCell<Vec<BuyTokenHistory>>,
+    /// Storage for tokens that have been bought
+    bought_tokens: RefCell<Vec<String>>,
+    /// History of bought goods
+    buy_history: RefCell<Vec<GoodHistory>>,
+    /// Storage for sell tokens
+    sell_tokens: RefCell<Vec<SellTokenHistory>>,
+    /// Storage for sold tokens
+    sold_tokens: RefCell<Vec<String>>,
 }
 
 /// Buying methods
@@ -170,9 +179,10 @@ impl MostSimpleStrategy {
 
     fn buy_locked_goods(&self, inventory: &mut Vec<Good>) {
         let mut buy_tokens = self.buy_tokens.borrow_mut();
-        let mut bought_tokens: Vec<BuyTokenHistory> = Vec::new();
-        for buy_token_history in buy_tokens.iter_mut() {
-            let (market_name, bid, token) = buy_token_history;
+        let mut bought_tokens = self.bought_tokens.borrow_mut();
+
+        for (market_name, bid, token) in buy_tokens.iter() {
+            // borrow market as mut
             let market = self.find_market_for_name(market_name).unwrap();
             let mut market = market.as_ref().borrow_mut();
 
@@ -184,21 +194,29 @@ impl MostSimpleStrategy {
                 let mut our_good = self
                     .get_mut_good_for_kind(bought_good.get_kind(), inventory)
                     .unwrap();
-                let _ = our_good.merge(bought_good.clone()); // TODO Check this: like in sell
-                                                             // also add the buy to the buy history
+                let _ = our_good.merge(bought_good.clone());
+                // also add the buy to the buy history
                 self.buy_history.borrow_mut().push((*bid, bought_good));
-                bought_tokens.push(buy_token_history.clone());
+                bought_tokens.push(token.clone());
+            }
+        }
+    }
+
+    fn clear_bought_tokens(&self) {
+        let mut buy_tokens = self.buy_tokens.borrow_mut();
+        let mut bought_tokens = self.bought_tokens.borrow();
+
+        for bought_token in bought_tokens.iter() {
+            if let Some(index) = buy_tokens
+                .iter()
+                .position(|(_, _, token)| *token == *bought_token)
+            {
+                // token was found -> remove it
+                buy_tokens.remove(index);
             }
         }
 
-        // remove bought tokens todo own method
-        for buy_token_history in bought_tokens {
-            let index = buy_tokens
-                .iter()
-                .position(|t| *t == buy_token_history)
-                .unwrap();
-            buy_tokens.remove(index);
-        }
+        // todo: Clear bought tokens ??
     }
 }
 
@@ -265,10 +283,10 @@ impl MostSimpleStrategy {
     }
 
     fn sell_locked_goods(&self, inventory: &mut Vec<Good>) {
-        let mut sold_tokens: Vec<SellTokenHistory> = Vec::new();
+        let mut sold_tokens = self.sold_tokens.borrow_mut();
         let mut sell_tokens = self.sell_tokens.borrow_mut();
-        for sell_token_history in sell_tokens.iter_mut() {
-            let (market_name, good, token) = sell_token_history;
+
+        for (market_name, good, token) in sell_tokens.iter_mut() {
             let market = self.find_market_for_name(&market_name).unwrap(); // todo error handling
             let mut market = market.as_ref().borrow_mut();
 
@@ -277,17 +295,24 @@ impl MostSimpleStrategy {
                     .get_mut_good_for_kind(GoodKind::EUR, inventory)
                     .unwrap();
                 let _ = eur.merge(cash); // todo handle the error
-                sold_tokens.push(sell_token_history.clone());
+                sold_tokens.push(token.clone());
             }
         }
+    }
 
-        // Remove old tokens that have been bought
-        for sell_token_history in sold_tokens {
-            let index = sell_tokens
+    // todo this redundant
+    fn clear_sold_tokens(&self) {
+        let mut sell_tokens = self.sell_tokens.borrow_mut();
+        let mut sold_tokens = self.sold_tokens.borrow();
+
+        for sold_token in sold_tokens.iter() {
+            if let Some(index) = sell_tokens
                 .iter()
-                .position(|t| *t == sell_token_history)
-                .unwrap();
-            sell_tokens.remove(index);
+                .position(|(_, _, token)| *token == *sold_token)
+            {
+                // token exist
+                sell_tokens.remove(index);
+            }
         }
     }
 }
@@ -318,6 +343,10 @@ impl MostSimpleStrategy {
             .iter()
             .find(|m| m.as_ref().borrow().get_name().to_string() == *name)
     }
+
+    fn increase_good_with_quantity(&self, good: &mut Good, quantity: f32) {
+        todo!()
+    }
 }
 
 /// Strategy trait implementation
@@ -325,10 +354,12 @@ impl Strategy for MostSimpleStrategy {
     fn new(markets: Vec<MarketRef>, trader_name: &String) -> Self {
         Self {
             trader_name: trader_name.clone(),
+            markets,
             buy_tokens: RefCell::new(Vec::new()),
+            bought_tokens: RefCell::new(Vec::new()),
             buy_history: RefCell::new(Vec::new()),
             sell_tokens: RefCell::new(Vec::new()),
-            markets,
+            sold_tokens: RefCell::new(Vec::new()),
         }
     }
 
@@ -373,9 +404,11 @@ impl Strategy for MostSimpleStrategy {
 
     fn apply(&self, goods: &mut Vec<Good>) {
         self.lock_cheapest_good_for_buy(goods); // 1. Lock buy the cheapest good we can find
-        self.buy_locked_goods(goods); // 2. Buy all locked goods // todo eur and goods is kinda redundant
-        self.lock_goods_for_sell(); // 3. Lock sell all goods for a higher price
-        self.sell_locked_goods(goods); // 4. Sell our goods
+        self.buy_locked_goods(goods); // 2. Buy all locked goods
+        self.clear_bought_tokens(); // 3. Clear buy tokens
+        self.lock_goods_for_sell(); // 4. Lock sell all goods for a higher price
+        self.sell_locked_goods(goods); // 5. Sell our goods
+        self.clear_sold_tokens(); // 6. Clear sell tokens
     }
 }
 
