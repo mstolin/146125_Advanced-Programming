@@ -10,12 +10,12 @@ use std::rc::Rc;
 use unitn_market_2022::good::good::Good;
 use unitn_market_2022::good::good_kind::GoodKind;
 use unitn_market_2022::market::good_label::GoodLabel;
-use unitn_market_2022::market::Market;
+use unitn_market_2022::market::{LockSellError, Market};
 use unitn_market_2022::wait_one_day;
 
 type BuyTokenHistory = (String, f32, String); // (market name, bid, buy token)
-type SellTokenHistory = (String, Good, String); // (market name, locked good, sell token)
-//type BuyHistory = HashMap<GoodKind, (f32, f32)>; // GoodKind: (quantity, paid price) //(f32, GoodKind); // (eur price, bought good)
+type SellTokenHistory = (String, GoodKind, String); // (market name, locked good, sell token)
+                                                    //type BuyHistory = HashMap<GoodKind, (f32, f32)>; // GoodKind: (quantity, paid price) //(f32, GoodKind); // (eur price, bought good)
 type BuyHistory = HashMap<GoodKind, Vec<f32>>;
 
 pub struct MostSimpleStrategy {
@@ -62,8 +62,7 @@ impl MostSimpleStrategy {
 
         while tries < max_tries {
             // get cheapest price for current quantity
-            if let Ok(buy_price) = market.get_buy_price(label.good_kind, tried_qty)
-            {
+            if let Ok(buy_price) = market.get_buy_price(label.good_kind, tried_qty) {
                 // is the price lower or equal to our maximum
                 if buy_price <= max_eur {
                     return Some((buy_price, tried_qty));
@@ -193,7 +192,7 @@ impl MostSimpleStrategy {
                 .get_mut_good_for_kind(GoodKind::EUR, inventory)
                 .unwrap();
             if let Ok(bought_good) = market.buy(token.clone(), eur) {
-                println!("SUCCESSFULLY BOUGHT {} {} FOR {} EUR AT {}", bought_good.get_qty(), bought_good.get_kind(), bid, market.get_name());
+                //println!("SUCCESSFULLY BOUGHT {} {} FOR {} EUR AT {}", bought_good.get_qty(), bought_good.get_kind(), bid, market.get_name());
                 self.add_to_buy_history(&bought_good, *bid);
                 // todo Better error handling
                 let mut our_good = self
@@ -277,14 +276,14 @@ impl MostSimpleStrategy {
             return None;
         }
 
-        let market =  market.as_ref().borrow();
+        let market = market.as_ref().borrow();
         let average_buy_price = self.get_average_price_for_good(&good.get_kind());
 
         //println!("TRY TO FIND ADEQUATE OFFER FOR {} {} AT {} EUR AVG AT MARKET {}", good.get_qty(), good.get_kind(), average_buy_price, market.get_name());
 
         // By default, start with max quantity available
         let mut quantity = good.get_qty();
-        let max_tries = 20;//(quantity / 2.0) as u32; // todo: There has to be a better solution
+        let max_tries = 20; //(quantity / 2.0) as u32; // todo: There has to be a better solution
         let mut tries: u32 = 0;
 
         while tries < max_tries {
@@ -294,11 +293,11 @@ impl MostSimpleStrategy {
                 //println!("AVG IS {} EUR FOR {} {} (OUR AVG {} EUR)", last_avg, quantity, good.get_kind(), average_buy_price);
                 // try find an avg. sell price that is higher than our avg. buy price to make profit
                 if avg > average_buy_price {
-                    println!("FOUND AN ADEQUATE OFFER: {} EUR FOR {} {} AT LAST AVG {} EUR AT MARKET {}", sell_price, quantity, good.get_kind(), avg, market.get_name());
+                    //println!("FOUND AN ADEQUATE OFFER: {} EUR FOR {} {} AT LAST AVG {} EUR AT MARKET {}", sell_price, quantity, good.get_kind(), avg, market.get_name());
                     return Some((sell_price, quantity));
                 }
             } else {
-                println!("!!!!!!!! WE HAVE AN ERROR");
+                //println!("!!!!!!!! WE HAVE AN ERROR");
                 dbg!(sell_price);
             }
 
@@ -311,10 +310,12 @@ impl MostSimpleStrategy {
         None
     }
 
-    fn lock_goods_for_sell(&self, inventory: &mut Vec<Good>) {
+    fn find_best_quantities_for_markets(
+        &self,
+        inventory: &Vec<Good>,
+    ) -> HashMap<String, HashMap<GoodKind, (f32, f32)>> {
         let mut offers = HashMap::new();
 
-        // 1. Find the quantity we can sell with the highest profit for that market for every good
         for market in self.markets.iter() {
             let mut market_offers = HashMap::new();
             for good in inventory.iter() {
@@ -325,7 +326,7 @@ impl MostSimpleStrategy {
 
                 let offer = self.find_adequate_offer(Rc::clone(market), good);
                 if let Some(offer) = offer {
-                    println!("FOUND OFFER OF {} EUR FOR {} {} AT {}", offer.0, offer.1, good.get_kind(), market.as_ref().borrow().get_name());
+                    //println!("FOUND OFFER OF {} EUR FOR {} {} AT {}", offer.0, offer.1, good.get_kind(), market.as_ref().borrow().get_name());
                     market_offers.insert(good.get_kind(), offer);
                 }
             }
@@ -334,7 +335,13 @@ impl MostSimpleStrategy {
             offers.insert(market_name.clone(), market_offers);
         }
 
-        // 2. Find the best offer for every good
+        offers
+    }
+
+    fn find_best_offers_for_good(
+        &self,
+        offers: &HashMap<String, HashMap<GoodKind, (f32, f32)>>,
+    ) -> HashMap<GoodKind, (String, f32, f32)> {
         let mut best_offers = HashMap::new();
         for (market_name, market_offers) in offers.iter() {
             // try to find the best offer for the current good
@@ -354,86 +361,77 @@ impl MostSimpleStrategy {
                     best_offers.insert(kind.clone(), (market_name.clone(), *price, *quantity));
                 }
             }
-
         }
+        best_offers
+    }
 
-        // 3. Lock best offers
-        for (kind, (market_name, offer, quantity)) in best_offers.iter() {
-            // We can be sure, this market exist
-            let market = self.markets.iter().find(|m| m.as_ref().borrow().get_name().to_string() == *market_name).map(|m| Rc::clone(m)).unwrap();
-            let mut market = market.as_ref().borrow_mut();
+    fn lock_sell_good(
+        &self,
+        mut market: RefMut<dyn Market>,
+        good: &Good,
+        offer: f32,
+        is_second_try: bool,
+    ) {
+        // try to lock it
+        let token = market.lock_sell(
+            good.get_kind(),
+            good.get_qty(),
+            offer,
+            self.trader_name.clone(),
+        );
 
-            // try to lock it
-            let token = market.lock_sell(kind.clone(), *quantity, *offer, self.trader_name.clone());
-            if let Ok(token) = token {
+        match token {
+            Ok(token) => {
                 // lock was successful, save token
-                let good_to_lock = Good::new(kind.clone(), *quantity);
-                println!("LOCKED {:?} FOR {} EUR", good_to_lock, offer);
-                self.sell_tokens
-                    .borrow_mut()
-                    .push((market_name.clone(), good_to_lock, token)); // TODO: Make custom struct Offer { }
-            } else {
-                // For whatever reason, market does not like to lock the good
-                // Therefore, we have to try the second best offer if available
-                println!("!!! MARKET {}: {:?}", market_name, token); // TODO ERROR InsufficientDefaultGoodQuantityAvailable
-
-                // 1. Remove this offer from best offers
-
-                // 2. Use recursion to retry
-            }
-        }
-
-        // 4. Remove all offers we can't sell anymore and repeat step 3
-
-
-        // try to sell every good we own
-        /*for good in inventory {
-            // ... except EUR
-            if good.get_kind() == GoodKind::EUR {
-                continue;
-            }
-
-            // Try find the highest selling market for an adequate quantity
-            let highest_selling_market = self.find_highest_selling_market_for_good(good);
-            if let Some((market_name, sell_price)) = highest_selling_market {
-                // now need to lock the good (can be sure that this market exist)
-                let market = self.find_market_for_name(&market_name).unwrap();
-                let mut market = market.as_ref().borrow_mut();
-
-                //let token = market.lock_sell()
-            }
-        }*/
-
-        /*for (good_kind, _) in self.buy_history.borrow().iter() {
-            // Don't sell EUR
-            if *good_kind == GoodKind::EUR {
-                continue;
-            }
-
-            // we can be sure that this good exist
-            let good = self.get_mut_good_for_kind(good_kind.clone(), inventory).unwrap();
-            // Find the market with highest sell price
-            if let Some((market_name, sell_price)) =
-                self.find_highest_selling_market_for_good(good)
-            {
-                // found an adequate market, now need to lock the good (can be sure that this market exist)
-                let market = self.find_market_for_name(&market_name).unwrap();
-                let mut market = market.as_ref().borrow_mut();
-
-                // now lock the good
-                if let Ok(token) = market.lock_sell(
+                self.sell_tokens.borrow_mut().push((
+                    market.get_name().to_string(),
                     good.get_kind(),
-                    good.get_qty(),
-                    sell_price,
-                    self.trader_name.clone(),
-                ) {
-                    // successfully locked good for sell, add token with price to the sell token history
-                    self.sell_tokens
-                        .borrow_mut()
-                        .push((market_name, good.clone(), token));
-                }
+                    token,
+                )); // TODO: Make custom struct Offer { }
             }
-        }*/
+            Err(err) => match err {
+                LockSellError::OfferTooHigh {
+                    offered_good_kind,
+                    offered_good_quantity,
+                    high_offer,
+                    highest_acceptable_offer,
+                } => {
+                    // Check if highest acceptable offer is adequate and lock
+                    let avg = highest_acceptable_offer / offered_good_quantity;
+                    let adequate_avg = self.get_average_price_for_good(&offered_good_kind);
+                    if avg > adequate_avg && !is_second_try {
+                        self.lock_sell_good(market, good, highest_acceptable_offer, true);
+                    }
+                }
+                _ => println!("SOME OTHER ERROR {:?}", err),
+            },
+        }
+    }
+
+    fn lock_best_offers_for_sell(&self, offers: &HashMap<GoodKind, (String, f32, f32)>) {
+        for (kind, (market_name, offer, quantity)) in offers.iter() {
+            // We can be sure, this market exist
+            let market = self
+                .markets
+                .iter()
+                .find(|m| m.as_ref().borrow().get_name().to_string() == *market_name)
+                .map(|m| Rc::clone(m))
+                .unwrap();
+            let mut market = market.as_ref().borrow_mut();
+            let good = Good::new(*kind, *quantity);
+            self.lock_sell_good(market, &good, *offer, false);
+        }
+    }
+
+    fn lock_goods_for_sell(&self, inventory: &mut Vec<Good>) {
+        // 1. Find the quantity we can sell with the highest profit for that market for every good
+        let offers = self.find_best_quantities_for_markets(inventory);
+        // 2. Find the best offer for every good
+        let best_offers = self.find_best_offers_for_good(&offers);
+        // 3. Lock best offers
+        self.lock_best_offers_for_sell(&best_offers);
+        // 4. Remove all offers we can't sell anymore and repeat
+        // todo: Is this necessary?
     }
 
     fn sell_locked_goods(&self, inventory: &mut Vec<Good>) {
@@ -441,11 +439,14 @@ impl MostSimpleStrategy {
         let mut sell_tokens = self.sell_tokens.borrow_mut();
 
         // loop over all sell tokens and sell the good
-        for (market_name, good, token) in sell_tokens.iter_mut() {
+        for (market_name, good_kind, token) in sell_tokens.iter_mut() {
             // We can be sure that this market exist
             let market = self.find_market_for_name(&market_name).unwrap();
             let mut market = market.as_ref().borrow_mut();
 
+            let mut good = self
+                .get_mut_good_for_kind(good_kind.clone(), inventory)
+                .unwrap();
             if let Ok(cash) = market.sell(token.clone(), good) {
                 // Now increase our eur quantity
                 let mut eur = self
@@ -495,6 +496,7 @@ impl MostSimpleStrategy {
         }
     }
 
+    // todo: Make kind ref
     fn get_mut_good_for_kind<'a>(
         &'a self,
         kind: GoodKind,
@@ -503,6 +505,7 @@ impl MostSimpleStrategy {
         inventory.iter_mut().find(|g| g.get_kind() == kind)
     }
 
+    // todo: Make kind ref
     fn get_good_for_kind<'a>(&'a self, kind: GoodKind, inventory: &'a Vec<Good>) -> Option<&Good> {
         inventory.iter().find(|g| g.get_kind() == kind)
     }
