@@ -384,7 +384,7 @@ impl MostSimpleStrategy {
         best_offers
     }
 
-    fn lock_sell_good(
+    fn lock_offer(
         &self,
         mut market: RefMut<dyn Market>,
         offer: Offer,
@@ -422,7 +422,7 @@ impl MostSimpleStrategy {
                     let adequate_avg = self.get_average_price_for_good(&offered_good_kind);
                     if avg > adequate_avg && !is_second_try {
                         let offer = Offer::new(highest_acceptable_offer, offer.quantity, offer.good_kind);
-                        self.lock_sell_good(market, offer, true);
+                        self.lock_offer(market, offer, true);
                     }
                 }
                 _ => warn!("Could not lock good for sell: {:?}", err),
@@ -430,8 +430,7 @@ impl MostSimpleStrategy {
         }
     }
 
-    // todo: Rename to lock_offers or lock_offers_for_sell
-    fn lock_best_offers_for_sell(&self, offers: &HashMap<GoodKind, (String, Offer)>) {
+    fn lock_offers(&self, offers: &HashMap<GoodKind, (String, Offer)>) {
         for (kind, (market_name, offer)) in offers.iter() {
             // We can be sure, this market exist
             let market = self
@@ -441,7 +440,7 @@ impl MostSimpleStrategy {
                 .map(|m| Rc::clone(m))
                 .unwrap(); // todo Update the find_market method
             let mut market = market.as_ref().borrow_mut();
-            self.lock_sell_good(market, offer.clone(), false);
+            self.lock_offer(market, offer.clone(), false);
         }
     }
 
@@ -451,7 +450,7 @@ impl MostSimpleStrategy {
         // 2. Find the best offer for every good
         let best_offers = self.filter_best_offers(&offers);
         // 3. Lock best offers
-        self.lock_best_offers_for_sell(&best_offers);
+        self.lock_offers(&best_offers);
         // 4. Remove all offers we can't sell anymore and repeat
         // todo: Is this necessary?
     }
@@ -588,7 +587,7 @@ impl Strategy for MostSimpleStrategy {
             }
         });
         let best_offers = self.filter_best_offers(&offers);
-        self.lock_best_offers_for_sell(&best_offers);
+        self.lock_offers(&best_offers);
         self.sell_locked_goods(goods);
     }
 
