@@ -302,55 +302,30 @@ impl MostSimpleStrategy {
         None
     }
 
-    // todo: Make reusable by adding param lowest_acceptable_SOMETHING
-    fn find_offers_for_max_qty(&self, inventory: &Vec<Good>) -> HashMap<String, HashMap<GoodKind, (f32, f32)>>  {
-        let mut offers = HashMap::new();
-        for market in self.markets.iter() {
-            let mut market_offers = HashMap::new();
-            let market = market.as_ref().borrow();
-            let market_name = market.get_name().to_string();
-
-            for good in inventory.iter() {
-                if good.get_kind() == GoodKind::EUR || good.get_qty() <= 0.0 {
-                    // we don't want to sell EUR
-                    continue;
-                }
-
-                let offer = market.get_sell_price(good.get_kind(), good.get_qty());
-                if let Ok(offer) = offer {
-                    info!("Found an offer for max. quantity of {} EUR for {} {} at market {}", offer, good.get_qty(), good.get_kind(), market_name);
-                    market_offers.insert(good.get_kind(), (offer, good.get_qty()));
-                } else {
-                    warn!("Didn't found an offer for max. quantity: {:?}", offer);
-                }
-            }
-
-            if !market_offers.is_empty() {
-                offers.insert(market_name, market_offers);
-            }
-        }
-        offers
-    }
-
-    // todo: Rename find_best_offers_for_markets
-    fn find_best_quantities_for_markets(
+    // todo: change to custom type: find_adequate_offer -> Option<Offer>
+    fn find_offers_for_markets<P>(
         &self,
         inventory: &Vec<Good>,
-    ) -> HashMap<String, HashMap<GoodKind, (f32, f32)>> {
+        find_adequate_offer: P
+    ) -> HashMap<String, HashMap<GoodKind, (f32, f32)>> where P: Fn(MarketRef, &Good) -> Option<(f32, f32)> {
         let mut offers = HashMap::new();
 
         for market in self.markets.iter() {
             let mut market_offers = HashMap::new();
+
             for good in inventory.iter() {
                 if good.get_kind() == GoodKind::EUR || good.get_qty() <= 0.0 {
                     // we don't want to sell EUR
                     continue;
                 }
 
-                let offer = self.find_adequate_offer(Rc::clone(market), good);
+                let offer = find_adequate_offer(Rc::clone(market), good);
+
+                let market = market.as_ref().borrow();
+                let market_name = market.get_name().to_string();
 
                 if let Some(offer) = offer {
-                    info!("Found an adequate offer of {} EUR for {} {} at market {}", offer.0, offer.1, good.get_kind(), market.as_ref().borrow().get_name());
+                    info!("Found an adequate offer of {} EUR for {} {} at market {}", offer.0, offer.1, good.get_kind(), market_name);
                     market_offers.insert(good.get_kind(), offer);
                 } else {
                     warn!("Didn't found an adequate offer for good ({:?})", good);
@@ -457,7 +432,7 @@ impl MostSimpleStrategy {
 
     fn lock_goods_for_sell(&self, inventory: &mut Vec<Good>) {
         // 1. Find the quantity we can sell with the highest profit for that market for every good
-        let offers = self.find_best_quantities_for_markets(inventory);
+        let offers = self.find_offers_for_markets(inventory, |m, g| self.find_adequate_offer(m, g));
         // 2. Find the best offer for every good
         let best_offers = self.find_best_offers_for_good(&offers);
         // 3. Lock best offers
@@ -481,7 +456,7 @@ impl MostSimpleStrategy {
                 .unwrap();
             let cash = market.sell(token.clone(), good);
             if let Ok(cash) = cash {
-                info!("Sold {} for {} EUR", good.get_kind(), cash.get_qty());
+                info!("Sold {} for {} EUR at market {}", good.get_kind(), cash.get_qty(), market_name);
                 // Now increase our eur quantity
                 let mut eur = self
                     .get_mut_good_for_kind(GoodKind::EUR, inventory)
@@ -587,7 +562,16 @@ impl Strategy for MostSimpleStrategy {
     fn sell_remaining_goods(&self, goods: &mut Vec<Good>) {
         info!("-------------------------");
         // Try to sell everything we have for the best price possible
-        let offers = self.find_offers_for_max_qty(goods);
+        let offers = self.find_offers_for_markets(goods, |market, good| {
+            let market = market.as_ref().borrow();
+            // Just return the offer for the max quantity
+            if let Ok(offer) = market.get_sell_price(good.get_kind(), good.get_qty()) {
+                Some((offer, good.get_qty()))
+            } else {
+                // todo: OfferTooHight -> Just return the highest acceptable offer
+                None
+            }
+        });
         let best_offers = self.find_best_offers_for_good(&offers);
         self.lock_best_offers_for_sell(&best_offers);
         self.sell_locked_goods(goods);
