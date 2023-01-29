@@ -4,7 +4,7 @@ use rand::seq::SliceRandom;
 use rand::thread_rng;
 use std::borrow::{Borrow, BorrowMut};
 use std::cell::{Cell, Ref, RefCell, RefMut};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::ops::Index;
 use std::rc::Rc;
 use log::{info, warn};
@@ -20,6 +20,7 @@ type BuyTokenHistory = (String, f32, String);
 type SellTokenHistory = (String, GoodKind, String);
 //type BuyHistory = HashMap<GoodKind, (f32, f32)>; // GoodKind: (quantity, paid price) //(f32, GoodKind); // (eur price, bought good)
 type BuyHistory = HashMap<GoodKind, Vec<f32>>;
+type MarketOffers = HashMap<String, Vec<Offer>>;
 
 #[derive(Clone, Debug)]
 struct Offer {
@@ -324,11 +325,11 @@ impl MostSimpleStrategy {
         &self,
         inventory: &Vec<Good>,
         find_adequate_offer: P
-    ) -> HashMap<String, HashMap<GoodKind, Offer>> where P: Fn(MarketRef, &Good) -> Option<Offer> {
+    ) -> MarketOffers where P: Fn(MarketRef, &Good) -> Option<Offer> {
         let mut offers = HashMap::new();
 
         for market in self.markets.iter() {
-            let mut market_offers = HashMap::new();
+            let mut market_offers = Vec::new();
 
             for good in inventory.iter() {
                 if good.get_kind() == GoodKind::EUR || good.get_qty() <= 0.0 {
@@ -343,7 +344,7 @@ impl MostSimpleStrategy {
 
                 if let Some(offer) = offer {
                     info!("Found an adequate offer of {} EUR for {} {} at market {}", offer.price, offer.quantity, offer.good_kind, market_name);
-                    market_offers.insert(good.get_kind(), offer);
+                    market_offers.push(offer);
                 } else {
                     warn!("Didn't found an adequate offer for good ({:?})", good);
                 }
@@ -358,17 +359,16 @@ impl MostSimpleStrategy {
         offers
     }
 
-    fn find_best_offers_for_good(
+    fn filter_best_offers(
         &self,
-        offers: &HashMap<String, HashMap<GoodKind, Offer>>,
+        offers: &MarketOffers,
     ) -> HashMap<GoodKind, (String, Offer)> {
         let mut best_offers: HashMap<GoodKind, (String, Offer)> = HashMap::new();
         for (market_name, market_offers) in offers.iter() {
             // try to find the best offer for the current good
-            for (kind, offer) in market_offers.iter() {
-                //let mut best_offer = ;
+            for offer in market_offers.iter() {
                 // Does a best offer already exist?
-                if let Some((best_market, best_offer)) = best_offers.get_mut(kind) {
+                if let Some((best_market, best_offer)) = best_offers.get_mut(&offer.good_kind) {
                     // Some best offer already exists, so compare it
                     if offer.price > best_offer.price {
                         // found a new best price => update
@@ -377,7 +377,7 @@ impl MostSimpleStrategy {
                     }
                 } else {
                     // has no offer yet, so insert current offer
-                    best_offers.insert(kind.clone(), (market_name.clone(), offer.clone()));
+                    best_offers.insert(offer.good_kind.clone(), (market_name.clone(), offer.clone()));
                 }
             }
         }
@@ -449,7 +449,7 @@ impl MostSimpleStrategy {
         // 1. Find the quantity we can sell with the highest profit for that market for every good
         let offers = self.find_offers_for_markets(inventory, |m, g| self.find_adequate_offer(m, g));
         // 2. Find the best offer for every good
-        let best_offers = self.find_best_offers_for_good(&offers);
+        let best_offers = self.filter_best_offers(&offers);
         // 3. Lock best offers
         self.lock_best_offers_for_sell(&best_offers);
         // 4. Remove all offers we can't sell anymore and repeat
@@ -587,7 +587,7 @@ impl Strategy for MostSimpleStrategy {
                 None
             }
         });
-        let best_offers = self.find_best_offers_for_good(&offers);
+        let best_offers = self.filter_best_offers(&offers);
         self.lock_best_offers_for_sell(&best_offers);
         self.sell_locked_goods(goods);
     }
