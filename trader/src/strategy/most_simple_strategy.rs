@@ -33,10 +33,21 @@ pub struct MostSimpleStrategy {
     sell_tokens: RefCell<Vec<SellTokenHistory>>,
     /// Storage for sold tokens
     sold_tokens: RefCell<Vec<String>>,
+    /// Number of buy operations
+    buy_count: RefCell<u32>,
+    /// Number of sell operations
+    sell_count: RefCell<u32>,
 }
 
 /// Buying methods
 impl MostSimpleStrategy {
+    fn can_buy_or_sell(&self) -> bool {
+        let sell_count = *self.sell_count.borrow();
+        let buy_count = *self.buy_count.borrow();
+        let diff = sell_count.abs_diff(buy_count);
+        diff <= 3
+    }
+
     /// Returns an adequate bid for the given EUR quantity.
     /// This method tries to get the maximum quantity of the good for the given label,
     /// that this strategy can buy with the given amount of EUR.
@@ -179,6 +190,10 @@ impl MostSimpleStrategy {
     }
 
     fn buy_locked_goods(&self, inventory: &mut Vec<Good>) {
+        if !self.can_buy_or_sell() {
+            return;
+        }
+
         let mut buy_tokens = self.buy_tokens.borrow_mut();
         let mut bought_tokens = self.bought_tokens.borrow_mut();
 
@@ -200,6 +215,9 @@ impl MostSimpleStrategy {
                     .unwrap();
                 let _ = our_good.merge(bought_good.clone());
                 bought_tokens.push(token.clone());
+                // Increase buy count
+                let mut buy_count = self.buy_count.borrow_mut();
+                *buy_count += 1;
             }
         }
     }
@@ -435,6 +453,10 @@ impl MostSimpleStrategy {
     }
 
     fn sell_locked_goods(&self, inventory: &mut Vec<Good>) {
+        if !self.can_buy_or_sell() {
+            return;
+        }
+
         let mut sold_tokens = self.sold_tokens.borrow_mut();
         let mut sell_tokens = self.sell_tokens.borrow_mut();
 
@@ -454,6 +476,9 @@ impl MostSimpleStrategy {
                     .unwrap();
                 let _ = eur.merge(cash); // todo handle the error
                 sold_tokens.push(token.clone());
+                // Increase sell count
+                let mut sell_count = self.sell_count.borrow_mut();
+                *sell_count += 1;
             }
         }
     }
@@ -535,6 +560,8 @@ impl Strategy for MostSimpleStrategy {
             buy_history: RefCell::new(MostSimpleStrategy::init_default_buy_history()),
             sell_tokens: RefCell::new(Vec::new()),
             sold_tokens: RefCell::new(Vec::new()),
+            sell_count: RefCell::new(0),
+            buy_count: RefCell::new(0),
         }
     }
 
