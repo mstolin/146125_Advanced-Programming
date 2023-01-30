@@ -349,7 +349,7 @@ impl MostSimpleStrategy {
         }
 
         let market = market.as_ref().borrow();
-        let average_buy_price = self.get_average_price_for_good(&good.get_kind());
+        let average_buy_price = self.get_avg_buy_price_per_piece(&good.get_kind());
 
         // By default, start with max quantity available
         let mut quantity = good.get_qty();
@@ -479,7 +479,7 @@ impl MostSimpleStrategy {
                     warn!("(Lock for sell) Offer too high, try again. ({:?})", err);
                     // Check if highest acceptable offer is adequate and lock
                     let avg = highest_acceptable_offer / offered_good_quantity;
-                    let adequate_avg = self.get_average_price_for_good(&offered_good_kind);
+                    let adequate_avg = self.get_avg_buy_price_per_piece(&offered_good_kind);
                     if avg > adequate_avg && !is_second_try {
                         let offer =
                             Payment::new(highest_acceptable_offer, offer.quantity, offer.good_kind, market_name);
@@ -598,13 +598,6 @@ impl MostSimpleStrategy {
         history
     }
 
-    fn increase_eur_qty(&self, goods: &mut Vec<Good>, merge_eur: Good) {
-        let eur = goods.iter_mut().find(|g| g.get_kind() == GoodKind::EUR);
-        if let Some(eur) = eur {
-            let _ = eur.merge(merge_eur);
-        }
-    }
-
     // todo: Make kind ref
     fn get_mut_good_for_kind<'a>(
         &'a self,
@@ -625,8 +618,7 @@ impl MostSimpleStrategy {
             .find(|m| m.as_ref().borrow().get_name().to_string() == *name)
     }
 
-    // todo: get_avg_buy_price_per_piece
-    fn get_average_price_for_good(&self, kind: &GoodKind) -> f32 {
+    fn get_avg_buy_price_per_piece(&self, kind: &GoodKind) -> f32 {
         let buy_history = self.buy_history.borrow();
         if let Some(good_history) = buy_history.get(kind) {
             if !good_history.is_empty() {
