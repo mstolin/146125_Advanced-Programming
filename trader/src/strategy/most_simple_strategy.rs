@@ -122,11 +122,11 @@ impl MostSimpleStrategy {
         good_kind: &GoodKind,
         max_eur: f32,
         find_adequate_bid: P,
-    ) -> HashMap<String, Payment>
+    ) -> Vec<Payment>
     where
         P: Fn(MarketRef, f32, &GoodKind) -> Option<Payment>,
     {
-        let mut bids = HashMap::new();
+        let mut bids = Vec::new();
 
         if *good_kind == GoodKind::EUR || max_eur <= 0.0 {
             return bids;
@@ -143,7 +143,7 @@ impl MostSimpleStrategy {
                     bid.quantity, bid.good_kind, bid.price, market_name
                 );
 
-                bids.insert(market_name, bid);
+                bids.push(bid);
             } else {
                 warn!("Didn't found an adequate bid for {}", good_kind);
             }
@@ -151,17 +151,16 @@ impl MostSimpleStrategy {
         bids
     }
 
-    fn filter_cheapest_bid(&self, bids: &HashMap<String, Payment>) -> Option<(String, Payment)> {
-        let mut cheapest_bid: Option<(String, Payment)> = None;
-        for (market_name, bid) in bids.iter() {
-            if let Some((cheapest_market, cheapest_bid)) = &mut cheapest_bid {
+    fn filter_cheapest_bid(&self, bids: &Vec<Payment>) -> Option<Payment> {
+        let mut cheapest_bid: Option<Payment> = None;
+        for bid in bids.iter() {
+            if let Some(cheapest_bid) = &mut cheapest_bid {
                 if bid.price > cheapest_bid.price {
                     // Found a cheaper bid
-                    *cheapest_market = market_name.clone();
                     *cheapest_bid = bid.clone();
                 }
             } else {
-                cheapest_bid = Some((market_name.clone(), bid.clone()));
+                cheapest_bid = Some(bid.clone());
             }
         }
         cheapest_bid
@@ -391,24 +390,23 @@ impl MostSimpleStrategy {
         offers
     }
 
-    fn filter_best_offers(&self, offers: &MarketOffers) -> HashMap<GoodKind, (String, Payment)> {
-        let mut best_offers: HashMap<GoodKind, (String, Payment)> = HashMap::new();
-        for (market_name, market_offers) in offers.iter() {
+    fn filter_best_offers(&self, offers: &MarketOffers) -> HashMap<GoodKind, Payment> {
+        let mut best_offers: HashMap<GoodKind, Payment> = HashMap::new();
+        for (_, market_offers) in offers.iter() {
             // try to find the best offer for the current good
             for offer in market_offers.iter() {
                 // Does a best offer already exist?
-                if let Some((best_market, best_offer)) = best_offers.get_mut(&offer.good_kind) {
+                if let Some(best_offer) = best_offers.get_mut(&offer.good_kind) {
                     // Some best offer already exists, so compare it
                     if offer.price > best_offer.price {
                         // found a new best price => update
-                        *best_market = market_name.clone();
                         *best_offer = offer.clone();
                     }
                 } else {
                     // has no offer yet, so insert current offer
                     best_offers.insert(
                         offer.good_kind.clone(),
-                        (market_name.clone(), offer.clone()),
+                        offer.clone(),
                     );
                 }
             }
@@ -459,13 +457,13 @@ impl MostSimpleStrategy {
         }
     }
 
-    fn lock_offers(&self, offers: &HashMap<GoodKind, (String, Payment)>) {
-        for (kind, (market_name, offer)) in offers.iter() {
+    fn lock_offers(&self, offers: &HashMap<GoodKind, Payment>) {
+        for (kind,  offer) in offers.iter() {
             // We can be sure, this market exist
             let market = self
                 .markets
                 .iter()
-                .find(|m| m.as_ref().borrow().get_name().to_string() == *market_name)
+                .find(|m| m.as_ref().borrow().get_name().to_string() == offer.market_name)
                 .map(|m| Rc::clone(m))
                 .unwrap(); // todo Update the find_market method
             let mut market = market.as_ref().borrow_mut();
