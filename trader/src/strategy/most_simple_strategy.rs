@@ -20,7 +20,6 @@ type BuyTokenHistory = (String, Payment, String);
 type SellTokenHistory = (String, GoodKind, String);
 /// kind: [(price, quantity)]
 type BuyHistory = HashMap<GoodKind, Vec<(f32, f32)>>;
-type MarketOffers = HashMap<String, Vec<Payment>>;
 
 #[derive(Clone, Debug)]
 struct Payment {
@@ -351,15 +350,13 @@ impl MostSimpleStrategy {
         &self,
         inventory: &Vec<Good>,
         find_adequate_offer: P,
-    ) -> MarketOffers
+    ) -> Vec<Payment>
     where
         P: Fn(MarketRef, &Good) -> Option<Payment>,
     {
-        let mut offers = HashMap::new();
+        let mut offers = Vec::new();
 
         for market in self.markets.iter() {
-            let mut market_offers = Vec::new();
-
             for good in inventory.iter() {
                 if good.get_kind() == GoodKind::EUR || good.get_qty() <= 0.0 {
                     // we don't want to sell EUR
@@ -376,38 +373,30 @@ impl MostSimpleStrategy {
                         "Found an adequate offer of{} {} for {} EUR at market {}",
                         offer.quantity, offer.good_kind, offer.price, market_name
                     );
-                    market_offers.push(offer);
+                    offers.push(offer);
                 } else {
                     warn!("Didn't found an adequate offer for good ({:?})", good);
                 }
-            }
-
-            let market_name = market.as_ref().borrow().get_name().to_string();
-            if !market_offers.is_empty() {
-                offers.insert(market_name.clone(), market_offers);
             }
         }
 
         offers
     }
 
-    fn filter_best_offers(&self, offers: &MarketOffers) -> Vec<Payment> {
+    fn filter_best_offers(&self, offers: &Vec<Payment>) -> Vec<Payment> {
         let mut best_offers: Vec<Payment> = Vec::new();
-        for (_, market_offers) in offers.iter() {
+        for offer in offers.iter() {
             // try to find the best offer for the current good
-            for offer in market_offers.iter() {
-                // Does a best offer already exist?
-                let best_offer = best_offers.iter_mut().find(|p| p.good_kind == offer.good_kind.clone());
-                if let Some(best_offer) = best_offer {
-                    // Some best offer already exists, so compare it
-                    if offer.price > best_offer.price {
-                        // found a new best price => update
-                        *best_offer = offer.clone();
-                    }
-                } else {
-                    // has no offer yet, so insert current offer
-                    best_offers.push(offer.clone());
+            let best_offer = best_offers.iter_mut().find(|p| p.good_kind == offer.good_kind.clone());
+            if let Some(best_offer) = best_offer {
+                // Some best offer already exists, so compare it
+                if offer.price > best_offer.price {
+                    // found a new best price => update
+                    *best_offer = offer.clone();
                 }
+            } else {
+                // has no offer yet, so insert current offer
+                best_offers.push(offer.clone());
             }
         }
         best_offers
@@ -510,7 +499,6 @@ impl MostSimpleStrategy {
                     &Good::new(good_kind.clone(), new_quantity * (-1.0)),
                     (cash.get_qty() * (-1.0)),
                 );
-                println!("{:?}", self.buy_history);
                 // Now increase our eur quantity
                 let mut eur = self
                     .get_mut_good_for_kind(GoodKind::EUR, inventory)
