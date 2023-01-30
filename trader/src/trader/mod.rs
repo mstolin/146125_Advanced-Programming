@@ -246,10 +246,9 @@ mod tests {
         let trader = Trader::from(StrategyIdentifier::Most_Simple, 1_000_000.0, markets);
 
         assert_eq!(0, trader.get_days(), "Trader should not have started now");
-        trader.apply_strategy(3, 60);
-        dbg!(trader.get_history().last());
+        trader.apply_strategy(7, 60);
         assert_eq!(
-            8,
+            7,
             trader.get_days(),
             "Trader must have been running for 7 days"
         );
