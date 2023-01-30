@@ -337,7 +337,12 @@ impl MostSimpleStrategy {
 
 /// Selling Methods
 impl MostSimpleStrategy {
-    /// Returns (offer, quantity)
+    /// Tries to find an adequate offer for given good (a good that this trader has bought) and at
+    /// the wanted market.
+    /// An offer is considered adequate, when the price per piece is below than the price per piece
+    /// this trader has paid.
+    /// This method tries to find an adequate offer for every possible quantity. It is possible,
+    /// that no adequate offer will be found for any quantity.
     fn find_adequate_offer(&self, market: MarketRef, good: &Good) -> Option<Payment> {
         if good.get_kind() == GoodKind::EUR || good.get_qty() <= 0.0 {
             return None;
@@ -376,6 +381,9 @@ impl MostSimpleStrategy {
         None
     }
 
+    /// This method tries to find adequate offers for all given markets.
+    /// As parameter, it takes a function that is being executed to find an adequate offer for a
+    /// specific market. By default this is [`find_adequate_offer`].
     fn find_offers_for_markets<P>(
         &self,
         inventory: &Vec<Good>,
@@ -413,6 +421,10 @@ impl MostSimpleStrategy {
         offers
     }
 
+    /// This method filters the best offers from the given offers. A best offer is the one, where
+    /// the trader makes the most profit from. Therefore, if the sell price for an offer (for a
+    /// specific kind) is higher than another, then it will choose the one with the highest
+    /// sell price.
     fn filter_best_offers(&self, offers: &Vec<Payment>) -> Vec<Payment> {
         let mut best_offers: Vec<Payment> = Vec::new();
         for offer in offers.iter() {
@@ -432,6 +444,10 @@ impl MostSimpleStrategy {
         best_offers
     }
 
+    /// This method locks an offer at the given market. If there is an error during the lock
+    /// operation, the method will try a second time with an updated offer. At second try, it checks
+    /// if the updated offer is still adequate, if yes, it locks again. The updated price is
+    /// received from the error message.
     fn lock_offer(&self, mut market: RefMut<dyn Market>, offer: Payment, is_second_try: bool) {
         // try to lock it
         let token = market.lock_sell(
@@ -475,6 +491,7 @@ impl MostSimpleStrategy {
         }
     }
 
+    /// This method tries to lock all given offers.
     fn lock_offers(&self, offers: &Vec<Payment>) {
         for offer in offers.iter() {
             // We can be sure, this market exist
@@ -489,6 +506,8 @@ impl MostSimpleStrategy {
         }
     }
 
+    /// This method first tries to find adequate offers to sell, and then tries to lock those
+    /// offers.
     fn lock_goods_for_sell(&self, inventory: &mut Vec<Good>) {
         // 1. Find the quantity we can sell with the highest profit for that market for every good
         let offers = self.find_offers_for_markets(inventory, |m, g| self.find_adequate_offer(m, g));
@@ -500,6 +519,9 @@ impl MostSimpleStrategy {
         // todo: Is this necessary?
     }
 
+    /// This method tries to sell all locked goods, where a token is found in [`sell_tokens`].
+    /// After a successful sell, it increases the trader EUR quantity and adds the offer (as
+    /// negative numbers) to the buy history.
     fn sell_locked_goods(&self, inventory: &mut Vec<Good>) {
         let mut sold_tokens = self.sold_tokens.borrow_mut();
         let mut sell_tokens = self.sell_tokens.borrow_mut();
@@ -545,6 +567,7 @@ impl MostSimpleStrategy {
     }
 
     // todo this redundant
+    /// This method clears all token from [`sell_tokens`] that are contained in [`sold_tokens`].
     fn clear_sold_tokens(&self) {
         let mut sell_tokens = self.sell_tokens.borrow_mut();
         let mut sold_tokens = self.sold_tokens.borrow();
