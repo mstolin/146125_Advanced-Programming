@@ -94,7 +94,12 @@ impl MostSimpleStrategy {
     ///
     /// It tries to find a quantity until the price for that quantity is below the given max. eur
     /// threshold. It is possible, that no adequate bid will be found.
-    fn find_adequate_bid(&self, market: MarketRef, max_eur: f32, kind: &GoodKind) -> Option<Payment> {
+    fn find_adequate_bid(
+        &self,
+        market: MarketRef,
+        max_eur: f32,
+        kind: &GoodKind,
+    ) -> Option<Payment> {
         if *kind == GoodKind::EUR || max_eur <= 0.0 {
             // Its not smart to buy eur for eur
             return None;
@@ -237,7 +242,7 @@ impl MostSimpleStrategy {
         let kind_to_buy = self.find_good_to_lock_buy(inventory);
         // 2. Find adequate bids per market
         let eur_qty = self
-            .get_good_for_kind(GoodKind::EUR, inventory)
+            .get_good_for_kind(&GoodKind::EUR, inventory)
             .unwrap()
             .get_qty();
         let adequate_bids =
@@ -276,7 +281,7 @@ impl MostSimpleStrategy {
             let mut market = market.as_ref().borrow_mut();
 
             let mut eur = self
-                .get_mut_good_for_kind(GoodKind::EUR, inventory)
+                .get_mut_good_for_kind(&GoodKind::EUR, inventory)
                 .unwrap();
             let bought_good = market.buy(token.clone(), eur);
             if let Ok(bought_good) = bought_good {
@@ -289,7 +294,7 @@ impl MostSimpleStrategy {
                 );
                 self.add_to_buy_history(&bought_good, bid.price);
                 let mut our_good = self
-                    .get_mut_good_for_kind(bought_good.get_kind(), inventory)
+                    .get_mut_good_for_kind(&bought_good.get_kind(), inventory)
                     .unwrap();
                 let _ = our_good.merge(bought_good.clone());
                 // todo: Why push, just do remove_buy_token(&token)??
@@ -324,7 +329,7 @@ impl MostSimpleStrategy {
         for bought_token in bought_tokens.iter() {
             if let Some(index) = buy_tokens
                 .iter()
-                .position(|(token, _,)| *token == *bought_token)
+                .position(|(token, _)| *token == *bought_token)
             {
                 // token was found -> remove it
                 buy_tokens.remove(index);
@@ -363,7 +368,12 @@ impl MostSimpleStrategy {
                 // try find an avg. sell price that is higher than our avg. buy price to make profit
                 if avg > average_buy_price {
                     let market_name = market.get_name().to_string();
-                    return Some(Payment::new(sell_price, quantity, good.get_kind(), market_name));
+                    return Some(Payment::new(
+                        sell_price,
+                        quantity,
+                        good.get_kind(),
+                        market_name,
+                    ));
                 }
             } else {
                 warn!(
@@ -429,7 +439,9 @@ impl MostSimpleStrategy {
         let mut best_offers: Vec<Payment> = Vec::new();
         for offer in offers.iter() {
             // try to find the best offer for the current good
-            let best_offer = best_offers.iter_mut().find(|p| p.good_kind == offer.good_kind.clone());
+            let best_offer = best_offers
+                .iter_mut()
+                .find(|p| p.good_kind == offer.good_kind.clone());
             if let Some(best_offer) = best_offer {
                 // Some best offer already exists, so compare it
                 if offer.price > best_offer.price {
@@ -465,9 +477,7 @@ impl MostSimpleStrategy {
                     "Locked good for sell {} {} for offer {} EUR at market {}",
                     offer.quantity, offer.good_kind, offer.price, market_name
                 );
-                self.sell_tokens
-                    .borrow_mut()
-                    .push((token, offer));
+                self.sell_tokens.borrow_mut().push((token, offer));
             }
             Err(err) => match err {
                 LockSellError::OfferTooHigh {
@@ -481,8 +491,12 @@ impl MostSimpleStrategy {
                     let avg = highest_acceptable_offer / offered_good_quantity;
                     let adequate_avg = self.get_avg_buy_price_per_piece(&offered_good_kind);
                     if avg > adequate_avg && !is_second_try {
-                        let offer =
-                            Payment::new(highest_acceptable_offer, offer.quantity, offer.good_kind, market_name);
+                        let offer = Payment::new(
+                            highest_acceptable_offer,
+                            offer.quantity,
+                            offer.good_kind,
+                            market_name,
+                        );
                         self.lock_offer(market, offer, true);
                     }
                 }
@@ -533,7 +547,7 @@ impl MostSimpleStrategy {
             let mut market = market.as_ref().borrow_mut();
 
             let mut good = self
-                .get_mut_good_for_kind(offer.good_kind.clone(), inventory)
+                .get_mut_good_for_kind(&offer.good_kind, inventory)
                 .unwrap();
             let old_quantity = good.get_qty();
             let cash = market.sell(token.clone(), good);
@@ -553,7 +567,7 @@ impl MostSimpleStrategy {
                 );
                 // Now increase our eur quantity
                 let mut eur = self
-                    .get_mut_good_for_kind(GoodKind::EUR, inventory)
+                    .get_mut_good_for_kind(&GoodKind::EUR, inventory)
                     .unwrap();
                 let _ = eur.merge(cash);
                 sold_tokens.push(token.clone());
@@ -586,6 +600,7 @@ impl MostSimpleStrategy {
 
 /// Helper methods
 impl MostSimpleStrategy {
+    /// Builds a default buy history that contains all tradable goods.
     fn init_default_buy_history() -> BuyHistory {
         // don't care about EUR
         let kinds = vec![GoodKind::USD, GoodKind::YEN, GoodKind::YUAN];
@@ -598,26 +613,30 @@ impl MostSimpleStrategy {
         history
     }
 
-    // todo: Make kind ref
+    /// Returns a mutable reference to the wanted good
     fn get_mut_good_for_kind<'a>(
         &'a self,
-        kind: GoodKind,
+        kind: &GoodKind,
         inventory: &'a mut Vec<Good>,
     ) -> Option<&mut Good> {
-        inventory.iter_mut().find(|g| g.get_kind() == kind)
+        inventory.iter_mut().find(|g| g.get_kind() == *kind)
     }
 
-    // todo: Make kind ref
-    fn get_good_for_kind<'a>(&'a self, kind: GoodKind, inventory: &'a Vec<Good>) -> Option<&Good> {
-        inventory.iter().find(|g| g.get_kind() == kind)
+    /// Returns a reference to the wanted good if available
+    fn get_good_for_kind<'a>(&'a self, kind: &GoodKind, inventory: &'a Vec<Good>) -> Option<&Good> {
+        inventory.iter().find(|g| g.get_kind() == *kind)
     }
 
-    fn find_market_for_name(&self, name: &String) -> Option<&MarketRef> {
+    /// Returns an optional ref the market, if a market for the given name as found.
+    fn find_market_for_name(&self, name: &String) -> Option<MarketRef> {
         self.markets
             .iter()
             .find(|m| m.as_ref().borrow().get_name().to_string() == *name)
+            .map(|m| Rc::clone(m))
     }
 
+    /// Returns the average price per piece this strategy has paid for a single piece of
+    /// the given good kind.
     fn get_avg_buy_price_per_piece(&self, kind: &GoodKind) -> f32 {
         let buy_history = self.buy_history.borrow();
         if let Some(good_history) = buy_history.get(kind) {
@@ -668,7 +687,12 @@ impl Strategy for MostSimpleStrategy {
             // Just return the offer for the max quantity
             if let Ok(price) = market.get_sell_price(good.get_kind(), good.get_qty()) {
                 let market_name = market.get_name().to_string();
-                Some(Payment::new(price, good.get_qty(), good.get_kind(), market_name))
+                Some(Payment::new(
+                    price,
+                    good.get_qty(),
+                    good.get_kind(),
+                    market_name,
+                ))
             } else {
                 // todo: OfferTooHight -> Just return the highest acceptable offer
                 None
