@@ -209,8 +209,7 @@ impl MostSimpleStrategy {
         }
     }
 
-    // todo: Rename lock_bids
-    fn lock_cheapest_bid(&self, inventory: &Vec<Good>) {
+    fn lock_bids(&self, inventory: &Vec<Good>) {
         // 1. Find good kind to buy
         let kind_to_buy = self.find_good_to_lock_buy(inventory);
         // 2. Find adequate bids per market
@@ -638,7 +637,7 @@ impl Strategy for MostSimpleStrategy {
     }
 
     fn apply(&self, goods: &mut Vec<Good>) {
-        self.lock_cheapest_bid(goods); // 1. Lock buy the cheapest good we can find
+        self.lock_bids(goods); // 1. Lock buy the cheapest good we can find
         self.buy_locked_goods(goods); // 2. Buy all locked goods
         self.clear_bought_tokens(); // 3. Clear buy tokens
         self.lock_goods_for_sell(goods); // 4. Lock sell all goods for a higher price
