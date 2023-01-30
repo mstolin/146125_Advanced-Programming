@@ -15,21 +15,24 @@ use unitn_market_2022::market::{LockSellError, Market};
 use unitn_market_2022::wait_one_day;
 
 /// (market name, bid, buy token)
-type BuyTokenHistory = (String, Payment, String);
-/// (market name, locked good, sell token)
-type SellTokenHistory = (String, GoodKind, String);
+type TokenHistory = (String, Payment);
 /// kind: [(price, quantity)]
 type BuyHistory = HashMap<GoodKind, Vec<(f32, f32)>>;
 
 #[derive(Clone, Debug)]
 struct Payment {
+    /// The offer or bid
     price: f32,
+    /// Quantity to sell or buy
     quantity: f32,
+    /// Kind of the good this payment is about
     good_kind: GoodKind,
+    /// The market that accepted/created this payment
     market_name: String,
 }
 
 impl Payment {
+    /// Constructs a new `Payment` instance
     fn new(price: f32, quantity: f32, good_kind: GoodKind, market_name: String) -> Self {
         Self {
             price,
@@ -46,13 +49,13 @@ pub struct MostSimpleStrategy {
     /// All markets this strategy works with
     markets: Vec<MarketRef>,
     /// Storage for buy tokens
-    buy_tokens: RefCell<Vec<BuyTokenHistory>>,
+    buy_tokens: RefCell<Vec<TokenHistory>>,
     /// Storage for tokens that have been bought
     bought_tokens: RefCell<Vec<String>>,
     /// History of bought goods
     buy_history: RefCell<BuyHistory>,
     /// Storage for sell tokens
-    sell_tokens: RefCell<Vec<SellTokenHistory>>,
+    sell_tokens: RefCell<Vec<TokenHistory>>,
     /// Storage for sold tokens
     sold_tokens: RefCell<Vec<String>>,
     /// Number of buy operations
@@ -199,7 +202,7 @@ impl MostSimpleStrategy {
                     bid.quantity, bid.good_kind, bid.price, market_name
                 );
                 let mut buy_tokens = self.buy_tokens.borrow_mut();
-                buy_tokens.push((market_name.clone(), bid.clone(), token.clone()));
+                buy_tokens.push((token.clone(), bid.clone()));
             } else {
                 warn!("Not able to lock good for buy: {:?}", token);
             }
@@ -241,9 +244,9 @@ impl MostSimpleStrategy {
         let mut bought_tokens = self.bought_tokens.borrow_mut();
 
         // loop over all buy tokens and buy the goods
-        for (market_name, bid, token) in buy_tokens.iter() {
+        for (token, bid) in buy_tokens.iter() {
             // borrow market as mut
-            let market = self.find_market_for_name(market_name).unwrap();
+            let market = self.find_market_for_name(&bid.market_name).unwrap();
             let mut market = market.as_ref().borrow_mut();
 
             let mut eur = self
@@ -256,7 +259,7 @@ impl MostSimpleStrategy {
                     bought_good.get_qty(),
                     bought_good.get_kind(),
                     bid.price,
-                    market_name
+                    bid.market_name
                 );
                 self.add_to_buy_history(&bought_good, bid.price);
                 // todo Better error handling
@@ -294,7 +297,7 @@ impl MostSimpleStrategy {
         for bought_token in bought_tokens.iter() {
             if let Some(index) = buy_tokens
                 .iter()
-                .position(|(_, _, token)| *token == *bought_token)
+                .position(|(token, _,)| *token == *bought_token)
             {
                 // token was found -> remove it
                 buy_tokens.remove(index);
@@ -421,7 +424,7 @@ impl MostSimpleStrategy {
                 );
                 self.sell_tokens
                     .borrow_mut()
-                    .push((market_name, offer.good_kind, token)); // TODO: Make custom struct Offer { }
+                    .push((token, offer));
             }
             Err(err) => match err {
                 LockSellError::OfferTooHigh {
@@ -475,13 +478,13 @@ impl MostSimpleStrategy {
         let mut sell_tokens = self.sell_tokens.borrow_mut();
 
         // loop over all sell tokens and sell the good
-        for (market_name, good_kind, token) in sell_tokens.iter_mut() {
+        for (token, offer) in sell_tokens.iter_mut() {
             // We can be sure that this market exist
-            let market = self.find_market_for_name(&market_name).unwrap();
+            let market = self.find_market_for_name(&offer.market_name).unwrap();
             let mut market = market.as_ref().borrow_mut();
 
             let mut good = self
-                .get_mut_good_for_kind(good_kind.clone(), inventory)
+                .get_mut_good_for_kind(offer.good_kind.clone(), inventory)
                 .unwrap();
             let old_quantity = good.get_qty();
             let cash = market.sell(token.clone(), good);
@@ -492,18 +495,18 @@ impl MostSimpleStrategy {
                     new_quantity,
                     good.get_kind(),
                     cash.get_qty(),
-                    market_name
+                    offer.market_name
                 );
                 // add (remove) from history
                 self.add_to_buy_history(
-                    &Good::new(good_kind.clone(), new_quantity * (-1.0)),
+                    &Good::new(offer.good_kind.clone(), new_quantity * (-1.0)), // TODO Check this
                     (cash.get_qty() * (-1.0)),
                 );
                 // Now increase our eur quantity
                 let mut eur = self
                     .get_mut_good_for_kind(GoodKind::EUR, inventory)
                     .unwrap();
-                let _ = eur.merge(cash); // todo handle the error
+                let _ = eur.merge(cash);
                 sold_tokens.push(token.clone());
                 // Increase sell count
                 let mut sell_count = self.sell_count.borrow_mut();
@@ -522,7 +525,7 @@ impl MostSimpleStrategy {
         for sold_token in sold_tokens.iter() {
             if let Some(index) = sell_tokens
                 .iter()
-                .position(|(_, _, token)| *token == *sold_token)
+                .position(|(token, _)| *token == *sold_token)
             {
                 // token exist
                 sell_tokens.remove(index);
