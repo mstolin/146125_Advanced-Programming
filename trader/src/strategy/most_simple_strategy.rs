@@ -15,23 +15,22 @@ use unitn_market_2022::market::{LockSellError, Market};
 use unitn_market_2022::wait_one_day;
 
 /// (market name, bid, buy token)
-type BuyTokenHistory = (String, Offer, String);
+type BuyTokenHistory = (String, Payment, String);
 /// (market name, locked good, sell token)
 type SellTokenHistory = (String, GoodKind, String);
 /// kind: [(price, quantity)]
 type BuyHistory = HashMap<GoodKind, Vec<(f32, f32)>>;
-type MarketOffers = HashMap<String, Vec<Offer>>;
+type MarketOffers = HashMap<String, Vec<Payment>>;
 
 #[derive(Clone, Debug)]
-// todo: Add market name, rename to OfferOrBid
-struct Offer {
+struct Payment {
     price: f32,
     quantity: f32,
     good_kind: GoodKind,
     market_name: String,
 }
 
-impl Offer {
+impl Payment {
     fn new(price: f32, quantity: f32, good_kind: GoodKind, market_name: String) -> Self {
         Self {
             price,
@@ -80,7 +79,7 @@ impl MostSimpleStrategy {
     /// It is possible that the given EUR is too low and no quantity will be found.
     ///
     /// The return value is (buy price in EUR, quantity of good).
-    fn find_adequate_bid(&self, market: MarketRef, max_eur: f32, kind: &GoodKind) -> Option<Offer> {
+    fn find_adequate_bid(&self, market: MarketRef, max_eur: f32, kind: &GoodKind) -> Option<Payment> {
         if *kind == GoodKind::EUR || max_eur <= 0.0 {
             // Its not smart to buy eur for eur
             return None;
@@ -106,7 +105,7 @@ impl MostSimpleStrategy {
                 if buy_price <= max_eur && bid_ex_rate < (market_ex_rate * 1.5) {
                     // buy price is below our maximum bid
                     let market_name = market.get_name().to_string();
-                    return Some(Offer::new(buy_price, tried_qty, *kind, market_name));
+                    return Some(Payment::new(buy_price, tried_qty, *kind, market_name));
                 }
             }
 
@@ -123,9 +122,9 @@ impl MostSimpleStrategy {
         good_kind: &GoodKind,
         max_eur: f32,
         find_adequate_bid: P,
-    ) -> HashMap<String, Offer>
+    ) -> HashMap<String, Payment>
     where
-        P: Fn(MarketRef, f32, &GoodKind) -> Option<Offer>,
+        P: Fn(MarketRef, f32, &GoodKind) -> Option<Payment>,
     {
         let mut bids = HashMap::new();
 
@@ -152,8 +151,8 @@ impl MostSimpleStrategy {
         bids
     }
 
-    fn filter_cheapest_bid(&self, bids: &HashMap<String, Offer>) -> Option<(String, Offer)> {
-        let mut cheapest_bid: Option<(String, Offer)> = None;
+    fn filter_cheapest_bid(&self, bids: &HashMap<String, Payment>) -> Option<(String, Payment)> {
+        let mut cheapest_bid: Option<(String, Payment)> = None;
         for (market_name, bid) in bids.iter() {
             if let Some((cheapest_market, cheapest_bid)) = &mut cheapest_bid {
                 if bid.price > cheapest_bid.price {
@@ -182,7 +181,7 @@ impl MostSimpleStrategy {
             .unwrap()
     }
 
-    fn lock_bid(&self, market_name: &String, bid: &Offer) {
+    fn lock_bid(&self, market_name: &String, bid: &Payment) {
         // We can be sure the market exist
         let market = self.find_market_for_name(market_name).unwrap();
         let mut market = market.as_ref().borrow_mut();
@@ -310,18 +309,13 @@ impl MostSimpleStrategy {
 /// Selling Methods
 impl MostSimpleStrategy {
     /// Returns (offer, quantity)
-    fn find_adequate_offer(&self, market: MarketRef, good: &Good) -> Option<Offer> {
+    fn find_adequate_offer(&self, market: MarketRef, good: &Good) -> Option<Payment> {
         if good.get_kind() == GoodKind::EUR || good.get_qty() <= 0.0 {
             return None;
         }
 
         let market = market.as_ref().borrow();
         let average_buy_price = self.get_average_price_for_good(&good.get_kind());
-
-        info!(
-            "TRY TO FIND AND OFFER WITH AVG PRICE ABOVE {}",
-            average_buy_price
-        );
 
         // By default, start with max quantity available
         let mut quantity = good.get_qty();
@@ -335,7 +329,7 @@ impl MostSimpleStrategy {
                 // try find an avg. sell price that is higher than our avg. buy price to make profit
                 if avg > average_buy_price {
                     let market_name = market.get_name().to_string();
-                    return Some(Offer::new(sell_price, quantity, good.get_kind(), market_name));
+                    return Some(Payment::new(sell_price, quantity, good.get_kind(), market_name));
                 }
             } else {
                 warn!(
@@ -359,7 +353,7 @@ impl MostSimpleStrategy {
         find_adequate_offer: P,
     ) -> MarketOffers
     where
-        P: Fn(MarketRef, &Good) -> Option<Offer>,
+        P: Fn(MarketRef, &Good) -> Option<Payment>,
     {
         let mut offers = HashMap::new();
 
@@ -397,8 +391,8 @@ impl MostSimpleStrategy {
         offers
     }
 
-    fn filter_best_offers(&self, offers: &MarketOffers) -> HashMap<GoodKind, (String, Offer)> {
-        let mut best_offers: HashMap<GoodKind, (String, Offer)> = HashMap::new();
+    fn filter_best_offers(&self, offers: &MarketOffers) -> HashMap<GoodKind, (String, Payment)> {
+        let mut best_offers: HashMap<GoodKind, (String, Payment)> = HashMap::new();
         for (market_name, market_offers) in offers.iter() {
             // try to find the best offer for the current good
             for offer in market_offers.iter() {
@@ -422,7 +416,7 @@ impl MostSimpleStrategy {
         best_offers
     }
 
-    fn lock_offer(&self, mut market: RefMut<dyn Market>, offer: Offer, is_second_try: bool) {
+    fn lock_offer(&self, mut market: RefMut<dyn Market>, offer: Payment, is_second_try: bool) {
         // try to lock it
         let token = market.lock_sell(
             offer.good_kind,
@@ -456,7 +450,7 @@ impl MostSimpleStrategy {
                     let adequate_avg = self.get_average_price_for_good(&offered_good_kind);
                     if avg > adequate_avg && !is_second_try {
                         let offer =
-                            Offer::new(highest_acceptable_offer, offer.quantity, offer.good_kind, market_name);
+                            Payment::new(highest_acceptable_offer, offer.quantity, offer.good_kind, market_name);
                         self.lock_offer(market, offer, true);
                     }
                 }
@@ -465,7 +459,7 @@ impl MostSimpleStrategy {
         }
     }
 
-    fn lock_offers(&self, offers: &HashMap<GoodKind, (String, Offer)>) {
+    fn lock_offers(&self, offers: &HashMap<GoodKind, (String, Payment)>) {
         for (kind, (market_name, offer)) in offers.iter() {
             // We can be sure, this market exist
             let market = self
@@ -644,7 +638,7 @@ impl Strategy for MostSimpleStrategy {
             // Just return the offer for the max quantity
             if let Ok(price) = market.get_sell_price(good.get_kind(), good.get_qty()) {
                 let market_name = market.get_name().to_string();
-                Some(Offer::new(price, good.get_qty(), good.get_kind(), market_name))
+                Some(Payment::new(price, good.get_qty(), good.get_kind(), market_name))
             } else {
                 // todo: OfferTooHight -> Just return the highest acceptable offer
                 None
