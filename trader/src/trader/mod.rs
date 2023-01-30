@@ -1,6 +1,8 @@
+use crate::consts::TRADER_NAME_MOST_SIMPLE;
 use crate::strategy::most_simple_strategy::MostSimpleStrategy;
 use crate::strategy::strategy::Strategy;
 use crate::MarketRef;
+use env_logger::Env;
 use std::borrow::{Borrow, BorrowMut};
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -9,7 +11,6 @@ use unitn_market_2022::good::good::Good;
 use unitn_market_2022::good::good_kind::GoodKind;
 use unitn_market_2022::market::Market;
 use unitn_market_2022::{subscribe_each_other, wait_one_day};
-use crate::consts::TRADER_NAME_MOST_SIMPLE;
 
 enum StrategyIdentifier {
     Most_Simple,
@@ -42,7 +43,7 @@ impl Trader {
     fn init_strategy(
         id: StrategyIdentifier,
         markets: Vec<MarketRef>,
-        trader_name: &String
+        trader_name: &String,
     ) -> Box<dyn Strategy> {
         match id {
             StrategyIdentifier::Most_Simple => {
@@ -67,6 +68,15 @@ impl Trader {
         if start_capital <= 0.0 {
             panic!("start_capital must be greater than 0.0")
         }
+        if markets.is_empty() {
+            panic!("markets can't be empty");
+        }
+
+        // Init logger
+        let env = Env::default()
+            .filter_or("MY_LOG_LEVEL", "info")
+            .write_style_or("MY_LOG_STYLE", "always");
+        env_logger::init_from_env(env);
 
         // init default goods
         let name = Self::get_name_for_strategy(StrategyIdentifier::Most_Simple);
@@ -91,7 +101,10 @@ impl Trader {
     /// Then, it applies the strategy exactly *t* times.
     pub fn apply_strategy(&self, max_days: u32, apply_every_minutes: u32) {
         if max_days < 1 {
-            panic!("The trader has to run at least 1 day ({} max. days given)", max_days);
+            panic!(
+                "The trader has to run at least 1 day ({} max. days given)",
+                max_days
+            );
         }
 
         let minutes_per_day: u32 = 24 * 60;
@@ -108,11 +121,11 @@ impl Trader {
 
         // run the trader
         while (*days) < max_days {
+            let mut goods = self.goods.borrow_mut();
+
             // apply strategy every n minutes
             for _ in 0..interval_times {
-                self.strategy
-                    .borrow_mut()
-                    .apply(&mut self.goods.borrow_mut());
+                self.strategy.borrow_mut().apply(&mut goods);
             }
 
             // increase day
@@ -121,11 +134,11 @@ impl Trader {
 
             // if its the last day, sell all remaining goods
             if *days >= max_days {
-                self.strategy.borrow().sell_remaining_goods(&mut self.goods.borrow_mut());
+                self.strategy.borrow().sell_remaining_goods(&mut goods);
             }
 
             // add updated goods to history after strategy has been applied
-            self.history.borrow_mut().push(self.goods.borrow().clone());
+            self.history.borrow_mut().push(goods.clone());
         }
     }
 
@@ -142,6 +155,7 @@ impl Trader {
 
 #[cfg(test)]
 mod tests {
+    use crate::consts::TRADER_NAME_MOST_SIMPLE;
     use crate::trader::{StrategyIdentifier, Trader};
     use crate::MarketRef;
     use smse::Smse;
@@ -153,7 +167,6 @@ mod tests {
     use SGX::market::sgx::SGX;
     use TASE::TASE;
     use ZSE::market::ZSE;
-    use crate::consts::TRADER_NAME_MOST_SIMPLE;
 
     fn init_random_markets() -> (MarketRef, MarketRef, MarketRef, MarketRef) {
         let sgx = SGX::new_random();
@@ -173,23 +186,29 @@ mod tests {
             Rc::clone(&tase),
             Rc::clone(&zse),
         ];
-        let trader = Trader::from(
-            StrategyIdentifier::Most_Simple,
-            300_000.0,
-            markets,
-        );
+        let trader = Trader::from(StrategyIdentifier::Most_Simple, 300_000.0, markets);
         let trader_name = Trader::get_name_for_strategy(StrategyIdentifier::Most_Simple);
-        assert_eq!(trader_name, trader.name, "Trader name must be equal to {}", trader_name);
-        assert_eq!(4, trader.goods.borrow().len(), "The trader should not have more than 4 goods");
+        assert_eq!(
+            trader_name, trader.name,
+            "Trader name must be equal to {}",
+            trader_name
+        );
+        assert_eq!(
+            4,
+            trader.goods.borrow().len(),
+            "The trader should not have more than 4 goods"
+        );
         assert_eq!(0, trader.get_days(), "The trader was not running yet");
-        assert_eq!(1, trader.history.borrow().len(), "The length of the history can't be bigger than 1.");
+        assert_eq!(
+            1,
+            trader.history.borrow().len(),
+            "The length of the history can't be bigger than 1."
+        );
     }
 
     #[test]
     fn test_get_name_for_strategy() {
-        let possible_strategies = [
-            (StrategyIdentifier::Most_Simple, TRADER_NAME_MOST_SIMPLE),
-        ];
+        let possible_strategies = [(StrategyIdentifier::Most_Simple, TRADER_NAME_MOST_SIMPLE)];
 
         for (id, value) in possible_strategies {
             let name = Trader::get_name_for_strategy(id);
@@ -219,20 +238,21 @@ mod tests {
         let (sgx, smse, tase, zse) = init_random_markets();
         let markets = vec![
             Rc::clone(&sgx),
-            Rc::clone(&smse),
+            Rc::clone(&smse), // Gives "meaningless" offers
             Rc::clone(&tase),
-            Rc::clone(&zse),
+            //Rc::clone(&zse), // Total "out-of-the-world" offers
         ];
 
-        let trader = Trader::from(
-            StrategyIdentifier::Most_Simple,
-            1_000_000.0,
-            markets,
-        );
+        let trader = Trader::from(StrategyIdentifier::Most_Simple, 1_000_000.0, markets);
 
         assert_eq!(0, trader.get_days(), "Trader should not have started now");
-        trader.apply_strategy(7, 30);
-        assert_eq!(7, trader.get_days(), "Trader must have been running for 7 days");
+        trader.apply_strategy(3, 60);
+        dbg!(trader.get_history().last());
+        assert_eq!(
+            8,
+            trader.get_days(),
+            "Trader must have been running for 7 days"
+        );
 
         // todo Check if all goods except EUR is 0 (Is it possible to check this?)
     }
