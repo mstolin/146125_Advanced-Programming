@@ -14,12 +14,14 @@ use unitn_market_2022::market::good_label::GoodLabel;
 use unitn_market_2022::market::{LockSellError, Market};
 use unitn_market_2022::wait_one_day;
 
-/// (market name, bid, buy token)
+/// This type represents the history for either buy or sell tokens.
+/// Each token has a corresponding offer or bid (as instance of `Payment`).
 type TokenHistory = (String, Payment);
-/// kind: [(price, quantity)]
+/// This type represents the buy history: kind: (buy_price, bought_quantity)
 type BuyHistory = HashMap<GoodKind, Vec<(f32, f32)>>;
 
 #[derive(Clone, Debug)]
+/// A `Payment` either represents an offer of market or bid from the trader for a good.
 struct Payment {
     /// The offer or bid
     price: f32,
@@ -68,6 +70,16 @@ pub struct MostSimpleStrategy {
 
 /// Buying methods
 impl MostSimpleStrategy {
+    /// Returns a boolean that represents if a buy operation is allowed at the moment.
+    /// A buy operation may be disallowed, if the absolute difference between the number of
+    /// sell and buy operations is lower than the number defined as [`max_diff_count_operations`].
+    ///
+    /// For example:
+    /// [`max_diff_count_operations`] = 5, `buy_operations` = 4, `sell_operations` = 2.
+    /// Then, the difference is 2 (< allowed diff) so a buy is allowed.
+    ///
+    /// This is done to prevent the trader (using this strategy) to buy all time, or in other words
+    /// to spent all the owned money.
     fn allowed_to_buy(&self) -> bool {
         let sell_count = *self.sell_count.borrow();
         let buy_count = *self.buy_count.borrow();
@@ -75,12 +87,13 @@ impl MostSimpleStrategy {
         diff <= self.max_diff_count_operations
     }
 
-    /// Returns an adequate bid for the given EUR quantity.
-    /// This method tries to get the maximum quantity of the good for the given label,
-    /// that this strategy can buy with the given amount of EUR.
-    /// It is possible that the given EUR is too low and no quantity will be found.
+    /// Returns an adequate bid for the wanted good and the max. available EUR quantity.
+    /// In this context, adequate means *"a good deal"*, that price of the bid is
+    /// lower than the max. money available, and the receiving quantity is high enough to be
+    /// considered good.
     ///
-    /// The return value is (buy price in EUR, quantity of good).
+    /// It tries to find a quantity until the price for that quantity is below the given max. eur
+    /// threshold. It is possible, that no adequate bid will be found.
     fn find_adequate_bid(&self, market: MarketRef, max_eur: f32, kind: &GoodKind) -> Option<Payment> {
         if *kind == GoodKind::EUR || max_eur <= 0.0 {
             // Its not smart to buy eur for eur
@@ -119,6 +132,8 @@ impl MostSimpleStrategy {
         None
     }
 
+    /// This method tries to find an adequate bid for every given market. It requires a predicate
+    /// function as parameter. By default, this should be [`find_adequate_bid`].
     fn find_adequate_bids<P>(
         &self,
         good_kind: &GoodKind,
@@ -153,6 +168,8 @@ impl MostSimpleStrategy {
         bids
     }
 
+    /// This method filters the best bid among all given bids.
+    /// The best bid is considered the one, that is the cheapest.
     fn filter_cheapest_bid(&self, bids: &Vec<Payment>) -> Option<Payment> {
         let mut cheapest_bid: Option<Payment> = None;
         for bid in bids.iter() {
@@ -168,6 +185,10 @@ impl MostSimpleStrategy {
         cheapest_bid
     }
 
+    /// This method find the best goo to lock buy. In this case, *best* is considered the good
+    /// where this trader owns the lowest quantity.
+    /// This is based on the assumption, that the quantity that hasn't been bought much, will
+    /// probably be the cheapest.
     fn find_good_to_lock_buy(&self, inventory: &Vec<Good>) -> GoodKind {
         // shuffle the inventory first, maybe all good are empty
         let mut shuffled_inventory = inventory.clone();
@@ -182,6 +203,7 @@ impl MostSimpleStrategy {
             .unwrap()
     }
 
+    /// This method locks the given bid for buy.
     fn lock_bid(&self, bid: &Payment) {
         // We can be sure the market exist
         let market_name = &bid.market_name;
@@ -209,6 +231,7 @@ impl MostSimpleStrategy {
         }
     }
 
+    /// This method tries to lock all bids.
     fn lock_bids(&self, inventory: &Vec<Good>) {
         // 1. Find good kind to buy
         let kind_to_buy = self.find_good_to_lock_buy(inventory);
@@ -233,6 +256,10 @@ impl MostSimpleStrategy {
         }
     }
 
+    /// This methods tries to buy all goods that have been locked in [`buy_tokens`].
+    /// If a buy wasn't successful, it will retry a second time with an updated price.
+    /// The updated price is usually received by the error message.
+    /// After the buy was successful, the bid is added to the [`buy_history`].
     fn buy_locked_goods(&self, inventory: &mut Vec<Good>) {
         if !self.allowed_to_buy() {
             warn!("Not allowed to buy");
@@ -261,7 +288,6 @@ impl MostSimpleStrategy {
                     bid.market_name
                 );
                 self.add_to_buy_history(&bought_good, bid.price);
-                // todo Better error handling
                 let mut our_good = self
                     .get_mut_good_for_kind(bought_good.get_kind(), inventory)
                     .unwrap();
@@ -277,7 +303,7 @@ impl MostSimpleStrategy {
         }
     }
 
-    /// This method adds the average price of the current buy to the history.
+    /// This method adds the bought good and the payed price to the [`buy_history`].
     /// Call this method after a successful buy.
     fn add_to_buy_history(&self, bought_good: &Good, bid: f32) {
         let mut buy_history = self.buy_history.borrow_mut();
@@ -289,6 +315,8 @@ impl MostSimpleStrategy {
         }
     }
 
+    /// This clears all token that have been bought. Bought tokens are saved in [`bought_tokens`].
+    /// If [`buy_tokens`] contains the same token, it will be removed.
     fn clear_bought_tokens(&self) {
         let mut buy_tokens = self.buy_tokens.borrow_mut();
         let mut bought_tokens = self.bought_tokens.borrow();
