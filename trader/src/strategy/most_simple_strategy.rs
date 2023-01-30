@@ -180,12 +180,13 @@ impl MostSimpleStrategy {
             .unwrap()
     }
 
-    fn lock_bid(&self, market_name: &String, bid: &Payment) {
+    fn lock_bid(&self, bid: &Payment) {
         // We can be sure the market exist
-        let market = self.find_market_for_name(market_name).unwrap();
-        let mut market = market.as_ref().borrow_mut();
+        let market_name = &bid.market_name;
+        let market = self.find_market_for_name(market_name);
 
-        if market.get_name() == market_name {
+        if let Some(market) = market {
+            let mut market = market.as_ref().borrow_mut();
             // 2. Lock good to buy
             let token = market.lock_buy(
                 bid.good_kind,
@@ -222,12 +223,12 @@ impl MostSimpleStrategy {
         // 3. Find cheapest bid among adequate bids for kind
         let cheapest_bids = self.filter_cheapest_bid(&adequate_bids);
         // 4. Lock cheapest bid
-        if let Some((market, bid)) = cheapest_bids {
+        if let Some(bid) = cheapest_bids {
             info!(
                 "Found an adequate bid: {} {} for {} EUR at {}",
-                bid.good_kind, bid.quantity, bid.price, market
+                bid.good_kind, bid.quantity, bid.price, bid.market_name
             );
-            self.lock_bid(&market, &bid);
+            self.lock_bid(&bid);
         }
     }
 
@@ -390,13 +391,14 @@ impl MostSimpleStrategy {
         offers
     }
 
-    fn filter_best_offers(&self, offers: &MarketOffers) -> HashMap<GoodKind, Payment> {
-        let mut best_offers: HashMap<GoodKind, Payment> = HashMap::new();
+    fn filter_best_offers(&self, offers: &MarketOffers) -> Vec<Payment> {
+        let mut best_offers: Vec<Payment> = Vec::new();
         for (_, market_offers) in offers.iter() {
             // try to find the best offer for the current good
             for offer in market_offers.iter() {
                 // Does a best offer already exist?
-                if let Some(best_offer) = best_offers.get_mut(&offer.good_kind) {
+                let best_offer = best_offers.iter_mut().find(|p| p.good_kind == offer.good_kind.clone());
+                if let Some(best_offer) = best_offer {
                     // Some best offer already exists, so compare it
                     if offer.price > best_offer.price {
                         // found a new best price => update
@@ -404,10 +406,7 @@ impl MostSimpleStrategy {
                     }
                 } else {
                     // has no offer yet, so insert current offer
-                    best_offers.insert(
-                        offer.good_kind.clone(),
-                        offer.clone(),
-                    );
+                    best_offers.push(offer.clone());
                 }
             }
         }
@@ -457,8 +456,8 @@ impl MostSimpleStrategy {
         }
     }
 
-    fn lock_offers(&self, offers: &HashMap<GoodKind, Payment>) {
-        for (kind,  offer) in offers.iter() {
+    fn lock_offers(&self, offers: &Vec<Payment>) {
+        for offer in offers.iter() {
             // We can be sure, this market exist
             let market = self
                 .markets
