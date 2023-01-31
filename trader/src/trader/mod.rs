@@ -3,6 +3,7 @@ use crate::strategies::most_simple_strategy::MostSimpleStrategy;
 use crate::strategies::strategy::Strategy;
 use crate::MarketRef;
 use env_logger::Env;
+use serde::Serialize;
 use std::cell::RefCell;
 
 use unitn_market_2022::good::good::Good;
@@ -13,7 +14,28 @@ pub enum StrategyIdentifier {
     MostSimple,
 }
 
-pub type TraderHistory = Vec<Vec<Good>>;
+#[derive(Clone, Debug, Serialize)]
+pub struct HistoryDay {
+    day: u32,
+    eur: f32,
+    usd: f32,
+    yen: f32,
+    yuan: f32,
+}
+
+impl HistoryDay {
+    fn new(day: u32, eur: f32, usd: f32, yen: f32, yuan: f32) -> Self {
+        Self {
+            day,
+            eur,
+            usd,
+            yen,
+            yuan,
+        }
+    }
+}
+
+pub type TraderHistory = Vec<HistoryDay>;
 
 pub struct Trader {
     /// Name of the trader
@@ -63,6 +85,20 @@ impl Trader {
         }
     }
 
+    /// Transforms a slice of goods to a [`HistoryDay`] struct.
+    fn transform_good_to_history_day(day: u32, goods: &[Good]) -> HistoryDay {
+        let mut day = HistoryDay::new(day, 0.0, 0.0, 0.0, 0.0);
+        for good in goods.iter() {
+            match good.get_kind() {
+                GoodKind::EUR => day.eur = good.get_qty(),
+                GoodKind::USD => day.usd = good.get_qty(),
+                GoodKind::YEN => day.yen = good.get_qty(),
+                GoodKind::YUAN => day.yuan = good.get_qty(),
+            }
+        }
+        day
+    }
+
     /// Instantiates a trader
     pub fn from(
         strategy_id: StrategyIdentifier,
@@ -86,7 +122,7 @@ impl Trader {
         let name = Self::get_name_for_strategy(StrategyIdentifier::MostSimple);
         let strategy = Self::init_strategy(strategy_id, markets, name);
         let goods = Self::create_goods(start_capital);
-        let history = Vec::from([goods.clone()]);
+        let history = Vec::from([Self::transform_good_to_history_day(0, &goods)]);
 
         // Make all market subscribe
         strategy.subscribe_all_markets();
@@ -151,7 +187,8 @@ impl Trader {
             }
 
             // add updated goods to history after strategy has been applied
-            self.history.borrow_mut().push(goods.clone());
+            let day = Trader::transform_good_to_history_day(*days, &goods);
+            self.history.borrow_mut().push(day);
         }
     }
 
@@ -165,6 +202,7 @@ impl Trader {
         self.history.borrow().clone()
     }
 
+    /// Returns the history as a json string
     pub fn get_history_as_json(&self) -> String {
         let history = self.history.borrow();
         serde_json::to_string(&history.clone()).unwrap_or_default()
