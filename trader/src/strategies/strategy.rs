@@ -30,8 +30,6 @@ pub trait Strategy {
             });
             for market_b in other_markets {
                 let market_b = Rc::clone(market_b);
-                let market_b_name = market_b.as_ref().borrow().get_name();
-                println!("{} subscribe to {}", market_a_name, market_b_name);
                 subscribe_each_other!(market_a, market_b);
             }
         }
