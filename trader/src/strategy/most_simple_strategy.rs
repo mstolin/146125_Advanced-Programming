@@ -174,7 +174,7 @@ impl MostSimpleStrategy {
 
     /// This method filters the best bid among all given bids.
     /// The best bid is considered the one, that is the cheapest.
-    fn filter_cheapest_bid(&self, bids: &Vec<Payment>) -> Option<Payment> {
+    fn filter_cheapest_bid(&self, bids: &[Payment]) -> Option<Payment> {
         let mut cheapest_bid: Option<Payment> = None;
         for bid in bids.iter() {
             if let Some(cheapest_bid) = &mut cheapest_bid {
@@ -193,9 +193,9 @@ impl MostSimpleStrategy {
     /// where this trader owns the lowest quantity.
     /// This is based on the assumption, that the quantity that hasn't been bought much, will
     /// probably be the cheapest.
-    fn find_good_to_lock_buy(&self, inventory: &Vec<Good>) -> GoodKind {
+    fn find_good_to_lock_buy(&self, inventory: &[Good]) -> GoodKind {
         // shuffle the inventory first, maybe all good are empty
-        let mut shuffled_inventory = inventory.clone();
+        let mut shuffled_inventory = inventory.to_owned();
         shuffled_inventory.shuffle(&mut thread_rng());
 
         shuffled_inventory
@@ -236,7 +236,7 @@ impl MostSimpleStrategy {
     }
 
     /// This method tries to lock all bids.
-    fn lock_bids(&self, inventory: &Vec<Good>) {
+    fn lock_bids(&self, inventory: &[Good]) {
         // 1. Find good kind to buy
         let kind_to_buy = self.find_good_to_lock_buy(inventory);
         // 2. Find adequate bids per market
@@ -264,7 +264,7 @@ impl MostSimpleStrategy {
     /// If a buy wasn't successful, it will retry a second time with an updated price.
     /// The updated price is usually received by the error message.
     /// After the buy was successful, the bid is added to the [`buy_history`].
-    fn buy_locked_goods(&self, inventory: &mut Vec<Good>) {
+    fn buy_locked_goods(&self, inventory: &mut [Good]) {
         if !self.allowed_to_buy() {
             warn!("Not allowed to buy");
             return;
@@ -395,7 +395,7 @@ impl MostSimpleStrategy {
     /// specific market. By default this is [`find_adequate_offer`].
     fn find_offers_for_markets<P>(
         &self,
-        inventory: &Vec<Good>,
+        inventory: &[Good],
         find_adequate_offer: P,
     ) -> Vec<Payment>
     where
@@ -434,7 +434,7 @@ impl MostSimpleStrategy {
     /// the trader makes the most profit from. Therefore, if the sell price for an offer (for a
     /// specific kind) is higher than another, then it will choose the one with the highest
     /// sell price.
-    fn filter_best_offers(&self, offers: &Vec<Payment>) -> Vec<Payment> {
+    fn filter_best_offers(&self, offers: &[Payment]) -> Vec<Payment> {
         let mut best_offers: Vec<Payment> = Vec::new();
         for offer in offers.iter() {
             // try to find the best offer for the current good
@@ -505,7 +505,7 @@ impl MostSimpleStrategy {
     }
 
     /// This method tries to lock all given offers.
-    fn lock_offers(&self, offers: &Vec<Payment>) {
+    fn lock_offers(&self, offers: &[Payment]) {
         for offer in offers.iter() {
             // We can be sure, this market exist
             let market = self
@@ -521,7 +521,7 @@ impl MostSimpleStrategy {
 
     /// This method first tries to find adequate offers to sell, and then tries to lock those
     /// offers.
-    fn lock_goods_for_sell(&self, inventory: &mut Vec<Good>) {
+    fn lock_goods_for_sell(&self, inventory: &mut [Good]) {
         // 1. Find the quantity we can sell with the highest profit for that market for every good
         let offers = self.find_offers_for_markets(inventory, |m, g| self.find_adequate_offer(m, g));
         // 2. Find the best offer for every good
@@ -535,7 +535,7 @@ impl MostSimpleStrategy {
     /// This method tries to sell all locked goods, where a token is found in [`sell_tokens`].
     /// After a successful sell, it increases the trader EUR quantity and adds the offer (as
     /// negative numbers) to the buy history.
-    fn sell_locked_goods(&self, inventory: &mut Vec<Good>) {
+    fn sell_locked_goods(&self, inventory: &mut [Good]) {
         let mut sold_tokens = self.sold_tokens.borrow_mut();
         let mut sell_tokens = self.sell_tokens.borrow_mut();
 
@@ -616,13 +616,13 @@ impl MostSimpleStrategy {
     fn get_mut_good_for_kind<'a>(
         &'a self,
         kind: &GoodKind,
-        inventory: &'a mut Vec<Good>,
+        inventory: &'a mut [Good],
     ) -> Option<&mut Good> {
         inventory.iter_mut().find(|g| g.get_kind() == *kind)
     }
 
     /// Returns a reference to the wanted good if available
-    fn get_good_for_kind<'a>(&'a self, kind: &GoodKind, inventory: &'a Vec<Good>) -> Option<&Good> {
+    fn get_good_for_kind<'a>(&'a self, kind: &GoodKind, inventory: &'a [Good]) -> Option<&Good> {
         inventory.iter().find(|g| g.get_kind() == *kind)
     }
 
@@ -630,7 +630,7 @@ impl MostSimpleStrategy {
     fn find_market_for_name(&self, name: &String) -> Option<MarketRef> {
         self.markets
             .iter()
-            .find(|m| m.as_ref().borrow().get_name().to_string() == *name)
+            .find(|m| &m.as_ref().borrow().get_name().to_string() == name)
             .map(Rc::clone)
     }
 
