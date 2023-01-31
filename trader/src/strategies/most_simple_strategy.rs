@@ -393,11 +393,7 @@ impl MostSimpleStrategy {
     /// This method tries to find adequate offers for all given markets.
     /// As parameter, it takes a function that is being executed to find an adequate offer for a
     /// specific market. By default this is [`find_adequate_offer`].
-    fn find_offers_for_markets<P>(
-        &self,
-        inventory: &[Good],
-        find_adequate_offer: P,
-    ) -> Vec<Payment>
+    fn find_offers_for_markets<P>(&self, inventory: &[Good], find_adequate_offer: P) -> Vec<Payment>
     where
         P: Fn(MarketRef, &Good) -> Option<Payment>,
     {
