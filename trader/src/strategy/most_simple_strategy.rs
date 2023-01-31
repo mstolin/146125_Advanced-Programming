@@ -3,16 +3,15 @@ use crate::MarketRef;
 use log::{info, warn};
 use rand::seq::SliceRandom;
 use rand::thread_rng;
-use std::borrow::{Borrow, BorrowMut};
+use std::borrow::Borrow;
 use std::cell::{RefCell, RefMut};
-use std::collections::{HashMap};
+use std::collections::HashMap;
 
 use std::rc::Rc;
 use unitn_market_2022::good::good::Good;
 use unitn_market_2022::good::good_kind::GoodKind;
 
 use unitn_market_2022::market::{LockSellError, Market};
-
 
 /// This type represents the history for either buy or sell tokens.
 /// Each token has a corresponding offer or bid (as instance of `Payment`).
@@ -680,7 +679,6 @@ impl Strategy for MostSimpleStrategy {
     }
 
     fn sell_remaining_goods(&self, goods: &mut Vec<Good>) {
-        info!("-------------------------");
         // Try to sell everything we have for the best price possible
         let offers = self.find_offers_for_markets(goods, |market, good| {
             let market = market.as_ref().borrow();
