@@ -158,6 +158,11 @@ impl Trader {
         self.history.borrow().clone()
     }
 
+    pub fn get_history_as_json(&self) -> String {
+        let history = self.history.borrow();
+        serde_json::to_string(&history.clone()).unwrap_or_default()
+    }
+
     /// Returns the name of this trader
     pub fn get_name(&self) -> &String {
         &self.name
