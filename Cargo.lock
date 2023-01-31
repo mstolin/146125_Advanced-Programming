@@ -2209,6 +2209,7 @@ dependencies = [
  "env_logger",
  "log",
  "rand",
+ "serde",
  "smse",
  "unitn_market_2022",
 ]

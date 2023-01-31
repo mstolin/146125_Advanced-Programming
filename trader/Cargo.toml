@@ -8,6 +8,7 @@ authors = ["Farid Ouedraogo, Marcel Stolin, Sebastiano Cassol, Jacopo Clocchiatt
 env_logger = "0.10.0"
 log = "0.4.17"
 rand = "0.8.5"
+serde = "1.0.152"
 unitn_market_2022 = { version = "1.0.10", registry = "kellnr" }
 
 [dev-dependencies]
