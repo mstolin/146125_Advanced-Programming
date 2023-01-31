@@ -5,12 +5,12 @@ use crate::MarketRef;
 use env_logger::Env;
 use std::borrow::{Borrow, BorrowMut};
 use std::cell::RefCell;
-use std::rc::Rc;
-use unitn_market_2022::good::consts::DEFAULT_GOOD_KIND;
+
+
 use unitn_market_2022::good::good::Good;
 use unitn_market_2022::good::good_kind::GoodKind;
-use unitn_market_2022::market::Market;
-use unitn_market_2022::{subscribe_each_other, wait_one_day};
+
+
 
 enum StrategyIdentifier {
     Most_Simple,
@@ -163,7 +163,7 @@ mod tests {
     use unitn_market_2022::good::good::Good;
     use unitn_market_2022::good::good_kind::GoodKind;
     use unitn_market_2022::market::Market;
-    use unitn_market_2022::subscribe_each_other;
+    
     use SGX::market::sgx::SGX;
     use TASE::TASE;
     use ZSE::market::ZSE;
@@ -235,7 +235,7 @@ mod tests {
 
     #[test]
     fn test_apply_strategy_for_one_week() {
-        let (sgx, smse, tase, zse) = init_random_markets();
+        let (sgx, smse, tase, _zse) = init_random_markets();
         let markets = vec![
             Rc::clone(&sgx),
             Rc::clone(&smse), // Gives "meaningless" offers
