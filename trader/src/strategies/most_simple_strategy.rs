@@ -1,4 +1,4 @@
-use crate::strategy::strategy::Strategy;
+use crate::strategies::strategy::Strategy;
 use crate::MarketRef;
 use log::{info, warn};
 use rand::seq::SliceRandom;
@@ -713,8 +713,8 @@ impl Strategy for MostSimpleStrategy {
 
 /*#[cfg(test)]
 mod tests {
-    use crate::strategy::most_simple_strategy::MostSimpleStrategy;
-    use crate::strategy::strategy::Strategy;
+    use crate::strategies::most_simple_strategy::MostSimpleStrategy;
+    use crate::strategies::strategies::Strategy;
     use crate::MarketRef;
     use smse::Smse;
     use std::borrow::Borrow;

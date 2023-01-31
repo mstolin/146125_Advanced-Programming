@@ -1,6 +1,6 @@
 use crate::consts::TRADER_NAME_MOST_SIMPLE;
-use crate::strategy::most_simple_strategy::MostSimpleStrategy;
-use crate::strategy::strategy::Strategy;
+use crate::strategies::most_simple_strategy::MostSimpleStrategy;
+use crate::strategies::strategy::Strategy;
 use crate::MarketRef;
 use env_logger::Env;
 use std::cell::RefCell;
