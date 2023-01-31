@@ -8,6 +8,7 @@ use std::cell::RefCell;
 use unitn_market_2022::good::good::Good;
 use unitn_market_2022::good::good_kind::GoodKind;
 
+#[derive(Clone, Debug)]
 pub enum StrategyIdentifier {
     MostSimple,
 }
@@ -102,6 +103,12 @@ impl Trader {
                 max_days
             );
         }
+        if apply_every_minutes < 1 {
+            panic!(
+                "The trader has to be applied at least ever 1 minute instead of every {} minute/s",
+                apply_every_minutes
+            );
+        }
 
         let minutes_per_day: u32 = 24 * 60;
         if apply_every_minutes > minutes_per_day {
@@ -160,6 +167,7 @@ mod tests {
     use crate::trader::{StrategyIdentifier, Trader};
     use crate::MarketRef;
     use smse::Smse;
+    use std::collections::HashMap;
     use std::rc::Rc;
     use unitn_market_2022::good::good::Good;
     use unitn_market_2022::good::good_kind::GoodKind;
@@ -187,10 +195,13 @@ mod tests {
             Rc::clone(&tase),
             Rc::clone(&zse),
         ];
+
+        // test if it works
         let trader = Trader::from(StrategyIdentifier::MostSimple, 300_000.0, markets);
         let trader_name = Trader::get_name_for_strategy(StrategyIdentifier::MostSimple);
         assert_eq!(
-            trader_name, trader.name,
+            trader_name,
+            trader.get_name(),
             "Trader name must be equal to {}",
             trader_name
         );
@@ -202,20 +213,28 @@ mod tests {
         assert_eq!(0, trader.get_days(), "The trader was not running yet");
         assert_eq!(
             1,
-            trader.history.borrow().len(),
+            trader.get_history().len(),
             "The length of the history can't be bigger than 1."
         );
     }
 
     #[test]
-    fn test_get_name_for_strategy() {
-        let possible_strategies = [(StrategyIdentifier::MostSimple, TRADER_NAME_MOST_SIMPLE)];
+    #[should_panic]
+    fn test_new_trader_with_no_capital() {
+        let (sgx, smse, tase, zse) = init_random_markets();
+        let markets = vec![
+            Rc::clone(&sgx),
+            Rc::clone(&smse),
+            Rc::clone(&tase),
+            Rc::clone(&zse),
+        ];
+        Trader::from(StrategyIdentifier::MostSimple, 0.0, markets);
+    }
 
-        for (id, value) in possible_strategies {
-            let name = Trader::get_name_for_strategy(id);
-            let value = value.to_string();
-            assert_eq!(value, name, "Name should be equal to constant ({})", value);
-        }
+    #[test]
+    #[should_panic]
+    fn test_new_trader_with_no_markets() {
+        Trader::from(StrategyIdentifier::MostSimple, 300_000.0, vec![]);
     }
 
     #[test]
@@ -235,7 +254,52 @@ mod tests {
     }
 
     #[test]
-    fn test_apply_strategy_for_one_week() {
+    #[should_panic]
+    fn test_apply_strategy_for_zero_days() {
+        let (sgx, smse, tase, _zse) = init_random_markets();
+        let markets = vec![Rc::clone(&sgx), Rc::clone(&smse), Rc::clone(&tase)];
+
+        let trader = Trader::from(StrategyIdentifier::MostSimple, 1_000_000.0, markets);
+        trader.apply_strategy(0, 0);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_apply_strategy_with_zero_minutes() {
+        let (sgx, smse, tase, _zse) = init_random_markets();
+        let markets = vec![Rc::clone(&sgx), Rc::clone(&smse), Rc::clone(&tase)];
+
+        let trader = Trader::from(StrategyIdentifier::MostSimple, 1_000_000.0, markets);
+        trader.apply_strategy(7, 0);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_apply_strategy_with_more_minutes_than_allowed() {
+        let (sgx, smse, tase, _zse) = init_random_markets();
+        let markets = vec![Rc::clone(&sgx), Rc::clone(&smse), Rc::clone(&tase)];
+        let minutes = 24 * 60;
+
+        let trader = Trader::from(StrategyIdentifier::MostSimple, 1_000_000.0, markets);
+        trader.apply_strategy(7, minutes + 1);
+    }
+
+    #[test]
+    fn test_get_name_for_strategy() {
+        let expected = HashMap::from([(TRADER_NAME_MOST_SIMPLE, StrategyIdentifier::MostSimple)]);
+
+        for (expected_name, id) in expected {
+            let name = Trader::get_name_for_strategy(id.clone());
+            assert_eq!(
+                expected_name, name,
+                "The name for id {:?} must be {}",
+                id, expected_name
+            );
+        }
+    }
+
+    #[test]
+    fn test_apply_simple_strategy_for_one_week() {
         let days = 7;
         let (sgx, smse, tase, _zse) = init_random_markets();
         let markets = vec![
