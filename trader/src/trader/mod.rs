@@ -307,6 +307,54 @@ mod tests {
     }
 
     #[test]
+    fn test_transform_good_to_history_day() {
+        // test with empty goods
+        let history = Trader::transform_good_to_history_day(12, &vec![]);
+        assert_eq!(12, history.day, "Day must be {}", 12);
+        assert_eq!(0.0, history.eur, "EUR must be {}", 0.0);
+        assert_eq!(0.0, history.usd, "USD must be {}", 0.0);
+        assert_eq!(0.0, history.yen, "YEN must be {}", 0.0);
+        assert_eq!(0.0, history.yuan, "YUAN must be {}", 0.0);
+
+        // test with a single good
+        let goods = vec![Good::new(GoodKind::YEN, 30_000.0)];
+        let history = Trader::transform_good_to_history_day(0, &goods);
+        assert_eq!(0, history.day, "Day must be {}", 0);
+        assert_eq!(0.0, history.eur, "EUR must be {}", 0.0);
+        assert_eq!(0.0, history.usd, "USD must be {}", 0.0);
+        assert_eq!(30_000.0, history.yen, "YEN must be {}", 30_000.0);
+        assert_eq!(0.0, history.yuan, "YUAN must be {}", 0.0);
+
+        // test with goods of the same kind
+        let goods = vec![
+            Good::new(GoodKind::YEN, 30_000.0),
+            Good::new(GoodKind::YEN, 15_000.0),
+            Good::new(GoodKind::YEN, 7_500.0),
+            Good::new(GoodKind::EUR, 30_000.0),
+        ];
+        let history = Trader::transform_good_to_history_day(6, &goods);
+        assert_eq!(6, history.day, "Day must be {}", 6);
+        assert_eq!(30_000.0, history.eur, "EUR must be {}", 30_000.0);
+        assert_eq!(0.0, history.usd, "USD must be {}", 0.0);
+        assert_eq!(7500.0, history.yen, "YEN must be {}", 7500.0);
+        assert_eq!(0.0, history.yuan, "YUAN must be {}", 0.0);
+
+        // test with non empty goods
+        let goods = vec![
+            Good::new(GoodKind::EUR, 130_000.0),
+            Good::new(GoodKind::USD, 10_000.0),
+            Good::new(GoodKind::YEN, 30_000.0),
+            Good::new(GoodKind::YUAN, 15_000.0),
+        ];
+        let history = Trader::transform_good_to_history_day(5, &goods);
+        assert_eq!(5, history.day, "Day must be {}", 5);
+        assert_eq!(130_000.0, history.eur, "EUR must be {}", 130_000.0);
+        assert_eq!(10_000.0, history.usd, "USD must be {}", 10_000.0);
+        assert_eq!(30_000.0, history.yen, "YEN must be {}", 30_000.0);
+        assert_eq!(15_000.0, history.yuan, "YUAN must be {}", 15_000.0);
+    }
+
+    #[test]
     #[should_panic]
     fn test_apply_strategy_for_zero_days() {
         let (sgx, smse, tase, _zse) = init_random_markets();
