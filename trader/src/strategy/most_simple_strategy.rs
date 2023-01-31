@@ -131,7 +131,7 @@ impl MostSimpleStrategy {
 
             // reduce the qty if no adequate price was found
             let s = tried_qty / 2.0; // to go below zero, this has to be higher than the half
-            tried_qty = tried_qty - s; // todo check for a more fine grained solution
+            tried_qty -= s; // todo check for a more fine grained solution
             tries += 1;
         }
         None
@@ -229,7 +229,7 @@ impl MostSimpleStrategy {
                     bid.quantity, bid.good_kind, bid.price, market_name
                 );
                 let mut buy_tokens = self.buy_tokens.borrow_mut();
-                buy_tokens.push((token.clone(), bid.clone()));
+                buy_tokens.push((token, bid.clone()));
             } else {
                 warn!("Not able to lock good for buy: {:?}", token);
             }
@@ -384,7 +384,7 @@ impl MostSimpleStrategy {
 
             // no good price for current quantity has been found, so lower the quantity to try with
             let s = quantity / 2.0;
-            quantity = quantity - s; // todo check for a more fine grained solution
+            quantity -= s; // todo check for a more fine grained solution
             tries += 1;
         }
 
@@ -441,7 +441,7 @@ impl MostSimpleStrategy {
             // try to find the best offer for the current good
             let best_offer = best_offers
                 .iter_mut()
-                .find(|p| p.good_kind == offer.good_kind.clone());
+                .find(|p| p.good_kind == offer.good_kind);
             if let Some(best_offer) = best_offer {
                 // Some best offer already exists, so compare it
                 if offer.price > best_offer.price {
@@ -512,8 +512,8 @@ impl MostSimpleStrategy {
             let market = self
                 .markets
                 .iter()
-                .find(|m| m.as_ref().borrow().get_name().to_string() == offer.market_name)
-                .map(|m| Rc::clone(m))
+                .find(|m| *m.as_ref().borrow().get_name() == offer.market_name)
+                .map(Rc::clone)
                 .unwrap(); // todo Update the find_market method
             let market = market.as_ref().borrow_mut();
             self.lock_offer(market, offer.clone(), false);
@@ -562,7 +562,7 @@ impl MostSimpleStrategy {
                 );
                 // add (remove) from history
                 self.add_to_buy_history(
-                    &Good::new(offer.good_kind.clone(), new_quantity * (-1.0)), // TODO Check this
+                    &Good::new(offer.good_kind, new_quantity * (-1.0)), // TODO Check this
                     cash.get_qty() * (-1.0),
                 );
                 // Now increase our eur quantity
@@ -632,7 +632,7 @@ impl MostSimpleStrategy {
         self.markets
             .iter()
             .find(|m| m.as_ref().borrow().get_name().to_string() == *name)
-            .map(|m| Rc::clone(m))
+            .map(Rc::clone)
     }
 
     /// Returns the average price per piece this strategy has paid for a single piece of
