@@ -72,7 +72,7 @@ impl Trader {
         let env = Env::default()
             .filter_or("MY_LOG_LEVEL", "info")
             .write_style_or("MY_LOG_STYLE", "always");
-        env_logger::init_from_env(env);
+        let _ = env_logger::try_init_from_env(env);
 
         // init default goods
         let name = Self::get_name_for_strategy(StrategyIdentifier::MostSimple);
