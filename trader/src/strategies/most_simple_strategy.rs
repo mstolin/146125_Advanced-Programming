@@ -659,9 +659,9 @@ impl MostSimpleStrategy {
 
 /// Strategy trait implementation
 impl Strategy for MostSimpleStrategy {
-    fn new(markets: Vec<MarketRef>, trader_name: &String) -> Self {
+    fn new(markets: Vec<MarketRef>, trader_name: &str) -> Self {
         Self {
-            trader_name: trader_name.clone(),
+            trader_name: trader_name.to_string(),
             markets,
             buy_tokens: RefCell::new(Vec::new()),
             bought_tokens: RefCell::new(Vec::new()),

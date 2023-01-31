@@ -39,7 +39,7 @@ impl Trader {
     fn init_strategy(
         id: StrategyIdentifier,
         markets: Vec<MarketRef>,
-        trader_name: &String,
+        trader_name: &str,
     ) -> Box<dyn Strategy> {
         match id {
             StrategyIdentifier::MostSimple => {
@@ -49,9 +49,9 @@ impl Trader {
     }
 
     /// Returns the name of the trader for the given strategy identifier.
-    fn get_name_for_strategy(id: StrategyIdentifier) -> String {
+    fn get_name_for_strategy(id: StrategyIdentifier) -> &'static str {
         match id {
-            StrategyIdentifier::MostSimple => TRADER_NAME_MOST_SIMPLE.to_string(),
+            StrategyIdentifier::MostSimple => TRADER_NAME_MOST_SIMPLE,
         }
     }
 
@@ -76,12 +76,12 @@ impl Trader {
 
         // init default goods
         let name = Self::get_name_for_strategy(StrategyIdentifier::MostSimple);
-        let strategy = Self::init_strategy(strategy_id, markets, &name);
+        let strategy = Self::init_strategy(strategy_id, markets, name);
         let goods = Self::create_goods(start_capital);
         let history = Vec::from([goods.clone()]);
 
         Self {
-            name,
+            name: name.to_string(),
             strategy: RefCell::new(strategy),
             goods: RefCell::new(goods),
             history: RefCell::new(history),
