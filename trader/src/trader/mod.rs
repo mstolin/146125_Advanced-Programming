@@ -16,10 +16,17 @@ pub enum StrategyIdentifier {
 pub type TraderHistory = Vec<Vec<Good>>;
 
 pub struct Trader {
+    /// Name of the trader
     name: String,
+    /// The strategy index, the trader is using
     strategy: RefCell<Box<dyn Strategy>>,
+    /// The goods the trader owns
     goods: RefCell<Vec<Good>>,
+    /// History of the goods.
+    /// Each row is a day (starting at day 0) and it represents the effects of the
+    /// buy and sell actions, the strategy as applied.
     history: RefCell<TraderHistory>,
+    /// Number of days the trader is running
     days: RefCell<u32>,
 }
 
