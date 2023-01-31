@@ -3,7 +3,6 @@ use crate::strategy::most_simple_strategy::MostSimpleStrategy;
 use crate::strategy::strategy::Strategy;
 use crate::MarketRef;
 use env_logger::Env;
-use std::borrow::{Borrow, BorrowMut};
 use std::cell::RefCell;
 
 
@@ -13,7 +12,7 @@ use unitn_market_2022::good::good_kind::GoodKind;
 
 
 enum StrategyIdentifier {
-    Most_Simple,
+    MostSimple,
 }
 
 pub type TraderHistory = Vec<Vec<Good>>;
@@ -46,7 +45,7 @@ impl Trader {
         trader_name: &String,
     ) -> Box<dyn Strategy> {
         match id {
-            StrategyIdentifier::Most_Simple => {
+            StrategyIdentifier::MostSimple => {
                 Box::new(MostSimpleStrategy::new(markets, trader_name))
             }
         }
@@ -55,7 +54,7 @@ impl Trader {
     /// Returns the name of the trader for the given strategy identifier.
     fn get_name_for_strategy(id: StrategyIdentifier) -> String {
         match id {
-            StrategyIdentifier::Most_Simple => TRADER_NAME_MOST_SIMPLE.to_string(),
+            StrategyIdentifier::MostSimple => TRADER_NAME_MOST_SIMPLE.to_string(),
         }
     }
 
@@ -79,7 +78,7 @@ impl Trader {
         env_logger::init_from_env(env);
 
         // init default goods
-        let name = Self::get_name_for_strategy(StrategyIdentifier::Most_Simple);
+        let name = Self::get_name_for_strategy(StrategyIdentifier::MostSimple);
         let strategy = Self::init_strategy(strategyId, markets, &name);
         let goods = Self::create_goods(start_capital);
         let history = Vec::from([goods.clone()]);
@@ -186,8 +185,8 @@ mod tests {
             Rc::clone(&tase),
             Rc::clone(&zse),
         ];
-        let trader = Trader::from(StrategyIdentifier::Most_Simple, 300_000.0, markets);
-        let trader_name = Trader::get_name_for_strategy(StrategyIdentifier::Most_Simple);
+        let trader = Trader::from(StrategyIdentifier::MostSimple, 300_000.0, markets);
+        let trader_name = Trader::get_name_for_strategy(StrategyIdentifier::MostSimple);
         assert_eq!(
             trader_name, trader.name,
             "Trader name must be equal to {}",
@@ -208,7 +207,7 @@ mod tests {
 
     #[test]
     fn test_get_name_for_strategy() {
-        let possible_strategies = [(StrategyIdentifier::Most_Simple, TRADER_NAME_MOST_SIMPLE)];
+        let possible_strategies = [(StrategyIdentifier::MostSimple, TRADER_NAME_MOST_SIMPLE)];
 
         for (id, value) in possible_strategies {
             let name = Trader::get_name_for_strategy(id);
@@ -243,7 +242,7 @@ mod tests {
             //Rc::clone(&zse), // Total "out-of-the-world" offers
         ];
 
-        let trader = Trader::from(StrategyIdentifier::Most_Simple, 1_000_000.0, markets);
+        let trader = Trader::from(StrategyIdentifier::MostSimple, 1_000_000.0, markets);
 
         assert_eq!(0, trader.get_days(), "Trader should not have started now");
         trader.apply_strategy(7, 60);
