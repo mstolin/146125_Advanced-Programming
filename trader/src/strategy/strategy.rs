@@ -1,6 +1,5 @@
 use crate::MarketRef;
 
-
 use std::rc::Rc;
 use unitn_market_2022::good::good::Good;
 use unitn_market_2022::wait_one_day;
