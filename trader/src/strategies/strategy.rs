@@ -2,7 +2,7 @@ use crate::MarketRef;
 
 use std::rc::Rc;
 use unitn_market_2022::good::good::Good;
-use unitn_market_2022::wait_one_day;
+use unitn_market_2022::{subscribe_each_other, wait_one_day};
 
 pub trait Strategy {
     /// Constructs a new trading strategy that works with the given markets.
@@ -17,6 +17,24 @@ pub trait Strategy {
         self.get_markets()
             .iter()
             .for_each(|m| wait_one_day!(Rc::clone(m)));
+    }
+    /// Makes that all given market subscribe to each other.
+    fn subscribe_all_markets(&self) {
+        let markets = self.get_markets();
+        for market_a in markets.iter() {
+            let market_a = Rc::clone(market_a);
+            let market_a_name = market_a.as_ref().borrow().get_name();
+            let other_markets = markets.iter().filter(|m| {
+                let market_name = m.as_ref().borrow().get_name();
+                market_name != market_a_name
+            });
+            for market_b in other_markets {
+                let market_b = Rc::clone(market_b);
+                let market_b_name = market_b.as_ref().borrow().get_name();
+                println!("{} subscribe to {}", market_a_name, market_b_name);
+                subscribe_each_other!(market_a, market_b);
+            }
+        }
     }
     /// At the end, we only want EURs in our inventory.
     /// When the trader stops, it is possible that other goods than EUR

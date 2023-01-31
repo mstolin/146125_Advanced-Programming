@@ -81,6 +81,9 @@ impl Trader {
         let goods = Self::create_goods(start_capital);
         let history = Vec::from([goods.clone()]);
 
+        // Make all market subscribe
+        strategy.subscribe_all_markets();
+
         Self {
             name: name.to_string(),
             strategy: RefCell::new(strategy),
