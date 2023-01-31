@@ -5,19 +5,16 @@ use crate::MarketRef;
 use env_logger::Env;
 use std::cell::RefCell;
 
-
 use unitn_market_2022::good::good::Good;
 use unitn_market_2022::good::good_kind::GoodKind;
 
-
-
-enum StrategyIdentifier {
+pub enum StrategyIdentifier {
     MostSimple,
 }
 
 pub type TraderHistory = Vec<Vec<Good>>;
 
-struct Trader {
+pub struct Trader {
     name: String,
     strategy: RefCell<Box<dyn Strategy>>,
     goods: RefCell<Vec<Good>>,
@@ -60,7 +57,7 @@ impl Trader {
 
     /// Instantiates a trader
     pub fn from(
-        strategyId: StrategyIdentifier,
+        strategy_id: StrategyIdentifier,
         start_capital: f32,
         markets: Vec<MarketRef>,
     ) -> Self {
@@ -79,7 +76,7 @@ impl Trader {
 
         // init default goods
         let name = Self::get_name_for_strategy(StrategyIdentifier::MostSimple);
-        let strategy = Self::init_strategy(strategyId, markets, &name);
+        let strategy = Self::init_strategy(strategy_id, markets, &name);
         let goods = Self::create_goods(start_capital);
         let history = Vec::from([goods.clone()]);
 
@@ -150,6 +147,11 @@ impl Trader {
     pub fn get_history(&self) -> TraderHistory {
         self.history.borrow().clone()
     }
+
+    /// Returns the name of this trader
+    pub fn get_name(&self) -> &String {
+        &self.name
+    }
 }
 
 #[cfg(test)]
@@ -162,7 +164,7 @@ mod tests {
     use unitn_market_2022::good::good::Good;
     use unitn_market_2022::good::good_kind::GoodKind;
     use unitn_market_2022::market::Market;
-    
+
     use SGX::market::sgx::SGX;
     use TASE::TASE;
     use ZSE::market::ZSE;
@@ -234,10 +236,11 @@ mod tests {
 
     #[test]
     fn test_apply_strategy_for_one_week() {
+        let days = 7;
         let (sgx, smse, tase, _zse) = init_random_markets();
         let markets = vec![
             Rc::clone(&sgx),
-            Rc::clone(&smse), // Gives "meaningless" offers
+            Rc::clone(&smse),
             Rc::clone(&tase),
             //Rc::clone(&zse), // Total "out-of-the-world" offers
         ];
@@ -247,11 +250,18 @@ mod tests {
         assert_eq!(0, trader.get_days(), "Trader should not have started now");
         trader.apply_strategy(7, 60);
         assert_eq!(
-            7,
+            days,
             trader.get_days(),
-            "Trader must have been running for 7 days"
+            "Trader must have been running for {} days",
+            days
         );
 
-        // todo Check if all goods except EUR is 0 (Is it possible to check this?)
+        let history = trader.get_history();
+        assert_eq!(
+            days + 1,
+            history.len() as u32,
+            "The length of the history is supposed to be one more than the days running ({})",
+            days + 1
+        );
     }
 }
