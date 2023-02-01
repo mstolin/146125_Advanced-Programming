@@ -1,65 +1,52 @@
-use clap::Parser;
+use clap::{Arg, Parser, Subcommand};
 use smse::Smse;
-use std::cell::RefCell;
+use std::process::ExitCode;
 use std::rc::Rc;
-use std::thread::sleep;
-use std::time::{Duration, Instant};
 use unitn_market_2022::market::Market;
 use SGX::market::sgx::SGX;
 use TASE::TASE;
 use ZSE::market::ZSE;
 
-type MarketRef = Rc<RefCell<dyn Market>>;
-
-struct CLI {
-    strategy: String,
-    max_seconds: u64,
-    sleep_seconds: u64,
+#[derive(Debug, Parser)]
+#[clap(about, author, version)]
+pub struct Args {
+    /// Name of the strategy the trader is supposed to use.
+    pub strategy: String,
+    /// List of markets the trader should work with.
+    pub markets: Vec<String>,
+    /// Verbose level.
+    #[arg(short, long, default_value_t = false)]
+    pub verbose: bool,
+    /// Log level.
+    #[arg(short, long, default_value = "error")]
+    pub log_level: String,
 }
 
-/// This will serve as the main endpoint where a strategy is being executed
-fn run_trader(interval: u64, time: &Instant, markets: &Vec<MarketRef>) {
-    println!(
-        "This is interval {} after {} secs.",
-        interval,
-        time.elapsed().as_secs()
-    );
+struct MarketFactory {
+    allowed_markets: Vec<String>,
+}
 
-    let sgx = markets
-        .iter()
-        .find(|m| m.borrow().get_name() == "SGX")
-        .unwrap();
-    let budget = sgx.borrow().get_budget();
-    println!("SGX BUDGET: {}", budget);
+impl MarketFactory {
+    fn gen_market(market_name: &String) -> Option<Rc<dyn Market>> {
+        let market_name = market_name.clone().to_ascii_lowercase();
+        None
+    }
+}
+
+fn parse_markets(markets: &[String]) {
+    for market_name in markets.iter() {
+        println!("WE HAVE {}", market_name);
+    }
 }
 
 fn main() {
-    // parse arguments
-    //let strategy =
+    let args = Args::parse();
 
-    // Init markets
-    let mut sgx = SGX::new_random();
-    let mut smse = Smse::new_random();
-    let mut tase = TASE::new_random();
-    let mut zse = ZSE::new_random();
-    let markets = Vec::from([sgx, smse, tase, zse]);
-    let markets = Vec::new();
-
-    // Definition for main loop
-    let now = Instant::now();
-    let run_forever = false; // true if max_seconds not set
-    let max_seconds: u64 = 20; // todo: Get from user
-    let sleep_time: u64 = 5; // todo: Get from user
-    let max_interval = max_seconds / sleep_time;
-
-    let mut interval = 0; // Interval counter
-    while run_forever || interval < max_interval {
-        run_trader(interval, &now, &markets);
-
-        interval += 1;
-        if run_forever || interval < max_interval {
-            // if this is not the last round, then sleep
-            sleep(Duration::new(5, 0));
-        }
+    if args.markets.is_empty() {
+        // we need at least one market to work with
+        println!("At least one market is required");
+        std::process::exit(1);
     }
+
+    parse_markets(&args.markets);
 }
