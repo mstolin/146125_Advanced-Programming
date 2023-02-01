@@ -51,8 +51,8 @@ struct MarketFactory();
 impl MarketFactory {
     /// Generates a random market instance for the given name.
     /// Currently the markets sgx, smse, tase, and zse are available.
-    fn gen_market(market_name: &String) -> Option<MarketRef> {
-        let market_name = market_name.clone().to_ascii_lowercase();
+    fn gen_market(market_name: &str) -> Option<MarketRef> {
+        let market_name = market_name.to_ascii_lowercase();
         match market_name.as_str() {
             "sgx" => Some(SGX::new_random()),
             "smse" => Some(Smse::new_random()),
