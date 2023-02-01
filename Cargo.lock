@@ -266,6 +266,8 @@ dependencies = [
  "TASE",
  "ZSE",
  "clap",
+ "env_logger",
+ "log",
  "smse",
  "trader",
  "unitn_market_2022",
