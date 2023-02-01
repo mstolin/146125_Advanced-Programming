@@ -1,6 +1,6 @@
 [workspace]
 members = [
-    "cli",
+    "trader-cli",
     "trader",
     "visualizer",
 ]

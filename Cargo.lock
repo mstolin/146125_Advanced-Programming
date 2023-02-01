@@ -259,21 +259,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "cli"
-version = "0.1.0"
-dependencies = [
- "SGX",
- "TASE",
- "ZSE",
- "clap",
- "env_logger",
- "log",
- "smse",
- "trader",
- "unitn_market_2022",
-]
-
-[[package]]
 name = "cmake"
 version = "0.1.49"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2236,6 +2221,21 @@ dependencies = [
  "serde",
  "serde_json",
  "smse",
+ "unitn_market_2022",
+]
+
+[[package]]
+name = "trader-cli"
+version = "0.1.0"
+dependencies = [
+ "SGX",
+ "TASE",
+ "ZSE",
+ "clap",
+ "env_logger",
+ "log",
+ "smse",
+ "trader",
  "unitn_market_2022",
 ]
 
