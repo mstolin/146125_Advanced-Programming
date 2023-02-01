@@ -1,4 +1,5 @@
 use clap::Parser;
+use env_logger::Env;
 use smse::Smse;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -21,18 +22,16 @@ pub struct Args {
     /// Available market names: sgx, smse, tase, zse.
     pub markets: Vec<String>,
     /// The starting capital in EUR for the trader.
-    /// The default value is 1.000.000,0 EUR.
     #[arg(short, long, default_value_t = 1_000_000.0)]
     pub capital: f32,
     /// The number of days this trader is suppose to run.
-    /// By default, the trader runs for 1 day.
     #[arg(short, long, default_value_t = 1)]
     pub days: u32,
-    /// Log level.
+    /// The log level of the application.
     #[arg(short, long, default_value = "error")]
     pub log_level: String,
-    /// The interval of minutes the trader applies its strategy per day.
-    /// By default, the trader applies its strategy every 60 minutes.
+    /// The interval of minutes, when the trader applies its strategy
+    /// during the day.
     #[arg(short, long, default_value_t = 60)]
     pub minute_interval: u32,
     /// Indicates if the history should be printed as JSON.
@@ -72,7 +71,7 @@ fn parse_markets(markets: &[String]) -> Vec<MarketRef> {
         if let Some(market) = MarketFactory::gen_market(market_name.as_str()) {
             market_refs.push(market);
         } else {
-            // todo: print a warning that no market was found
+            println!("Market '{market_name}' is not available. Try sgx, smse, tase, or zse.");
         }
     }
     market_refs
@@ -88,6 +87,10 @@ fn map_strategy_to_id(strategy: &str) -> Option<StrategyIdentifier> {
 
 fn main() {
     let args = Args::parse();
+
+    // Init logger
+    let env = Env::default().filter_or("MY_LOG_LEVEL", args.log_level);
+    let _ = env_logger::try_init_from_env(env);
 
     let strategy_id = map_strategy_to_id(args.strategy.as_str());
     if let Some(strategy_id) = strategy_id {
@@ -108,7 +111,10 @@ fn main() {
             }
         }
     } else {
-        // TODO: Print warn that no strategy was found
+        println!(
+            "No strategy called '{}' available. Try mostsimple.",
+            args.strategy
+        );
         std::process::exit(1);
     }
 }
