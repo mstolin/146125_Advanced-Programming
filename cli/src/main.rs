@@ -67,6 +67,12 @@ impl MarketFactory {
 /// generate a market.
 fn parse_markets(markets: &[String]) -> Vec<MarketRef> {
     let mut market_refs = Vec::new();
+    let mut markets = markets
+        .iter()
+        .map(|m| m.to_ascii_lowercase())
+        .collect::<Vec<String>>();
+    // remove duplicates
+    markets.dedup();
     for market_name in markets.iter() {
         if let Some(market) = MarketFactory::gen_market(market_name.as_str()) {
             market_refs.push(market);
@@ -116,5 +122,78 @@ fn main() {
             args.strategy
         );
         std::process::exit(1);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{map_strategy_to_id, parse_markets};
+    use trader::trader::StrategyIdentifier;
+
+    #[test]
+    fn test_parse_markets() {
+        // Test with empty slice
+        let markets = parse_markets(&[]);
+        assert_eq!(
+            0,
+            markets.len(),
+            "No markets should be geenrated for an empty slice"
+        );
+
+        // Test with no existing markets
+        let names: Vec<String> = Vec::from(["a".to_string(), "b".to_string()]);
+        let markets = parse_markets(&names);
+        assert_eq!(
+            0,
+            markets.len(),
+            "No markets should be generated for none existing names"
+        );
+
+        // Test with multiple existing markets
+        let names: Vec<String> =
+            Vec::from(["sgx".to_string(), "sgx".to_string(), "smse".to_string()]);
+        let markets = parse_markets(&names);
+        assert_eq!(2, markets.len(), "There shouldn't be any duplicates");
+
+        // Test with all available markets
+        let names: Vec<String> = Vec::from([
+            "sgx".to_string(),
+            "smse".to_string(),
+            "tase".to_string(),
+            "zse".to_string(),
+        ]);
+        let markets = parse_markets(&names);
+        assert_eq!(4, markets.len(), "There must be {} markets", names.len());
+    }
+
+    #[test]
+    fn test_map_strategy_to_id() {
+        // test with empty str
+        let id = map_strategy_to_id("");
+        assert_eq!(
+            None, id,
+            "No identifier should be returned for an empty str"
+        );
+
+        // test non existing strategy
+        let strategy = "NON-EXISTING-STRATEGY";
+        let id = map_strategy_to_id(strategy);
+        assert_eq!(
+            None, id,
+            "No identifier should be returned for the strategy {}",
+            strategy
+        );
+
+        // test existing strategy
+        let strategy = "mostsimple";
+        let expected = StrategyIdentifier::MostSimple;
+        let id = map_strategy_to_id(strategy);
+        assert_eq!(
+            Some(expected.clone()),
+            id,
+            "The id for the strategy '{}' must be '{:?}'",
+            strategy,
+            expected
+        );
     }
 }
