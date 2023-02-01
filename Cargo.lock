@@ -267,6 +267,7 @@ dependencies = [
  "ZSE",
  "clap",
  "smse",
+ "trader",
  "unitn_market_2022",
 ]
 

@@ -6,6 +6,7 @@ authors = ["Farid Ouedraogo, Marcel Stolin, Sebastiano Cassol, Jacopo Clocchiatt
 
 [dependencies]
 clap = { version = "4.0.32", features = ["derive"] }
+trader = { path = "../trader" }
 unitn_market_2022 = { version = "1.0.10", registry = "kellnr" }
 TASE = { version = "0.1.2", registry = "kellnr" }
 ZSE = { version = "0.1.3", registry = "kellnr" }
