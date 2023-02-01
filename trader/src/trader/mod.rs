@@ -9,7 +9,7 @@ use std::cell::RefCell;
 use unitn_market_2022::good::good::Good;
 use unitn_market_2022::good::good_kind::GoodKind;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, Ord, PartialOrd, PartialEq)]
 pub enum StrategyIdentifier {
     MostSimple,
 }
