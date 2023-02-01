@@ -127,7 +127,7 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use crate::{map_strategy_to_id, parse_markets};
+    use crate::{map_strategy_to_id, parse_markets, MarketFactory};
     use trader::trader::StrategyIdentifier;
 
     #[test]
@@ -195,5 +195,35 @@ mod tests {
             strategy,
             expected
         );
+    }
+
+    #[test]
+    fn test_market_factory_gen_market() {
+        // test with empty str
+        let market = MarketFactory::gen_market("");
+        assert!(
+            market.is_none(),
+            "There should be no market for an empty name"
+        );
+
+        // test with non known name
+        let market_name = "NON-EXISTING";
+        let market = MarketFactory::gen_market(market_name);
+        assert!(
+            market.is_none(),
+            "There should be no market generated for unknown name '{}'",
+            market_name
+        );
+
+        // test all known market names
+        let known_names = vec!["sgx", "smse", "tase", "zse"];
+        for market_name in known_names {
+            let market = MarketFactory::gen_market(market_name);
+            assert!(
+                market.is_some(),
+                "There must be a market generated for name '{}'",
+                market_name
+            );
+        }
     }
 }
