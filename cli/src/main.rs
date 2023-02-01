@@ -1,4 +1,4 @@
-use clap::{Parser};
+use clap::Parser;
 use smse::Smse;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -69,7 +69,7 @@ impl MarketFactory {
 fn parse_markets(markets: &[String]) -> Vec<MarketRef> {
     let mut market_refs = Vec::new();
     for market_name in markets.iter() {
-        if let Some(market) = MarketFactory::gen_market(market_name) {
+        if let Some(market) = MarketFactory::gen_market(market_name.as_str()) {
             market_refs.push(market);
         } else {
             // todo: print a warning that no market was found
@@ -79,8 +79,8 @@ fn parse_markets(markets: &[String]) -> Vec<MarketRef> {
 }
 
 /// Tries to map the given strategy name to a `StrategyIdentifier`.
-fn map_strategy_to_id(strategy: String) -> Option<StrategyIdentifier> {
-    match strategy.as_str() {
+fn map_strategy_to_id(strategy: &str) -> Option<StrategyIdentifier> {
+    match strategy {
         "mostsimple" => Some(StrategyIdentifier::MostSimple),
         _ => None,
     }
@@ -89,7 +89,7 @@ fn map_strategy_to_id(strategy: String) -> Option<StrategyIdentifier> {
 fn main() {
     let args = Args::parse();
 
-    let strategy_id = map_strategy_to_id(args.strategy);
+    let strategy_id = map_strategy_to_id(args.strategy.as_str());
     if let Some(strategy_id) = strategy_id {
         let markets = parse_markets(&args.markets);
         if markets.is_empty() {
