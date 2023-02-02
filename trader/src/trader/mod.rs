@@ -297,19 +297,19 @@ mod tests {
         assert_eq!(4, goods.len());
 
         let eur = Good::new(GoodKind::EUR, default_qty);
-        assert_eq!(true, goods.contains(&eur), "{:?} not found in goods", eur);
+        assert!(goods.contains(&eur), "{:?} not found in goods", eur);
         let usd = Good::new(GoodKind::USD, 0.0);
-        assert_eq!(true, goods.contains(&usd), "{:?} not found in goods", usd);
+        assert!(goods.contains(&usd), "{:?} not found in goods", usd);
         let yuan = Good::new(GoodKind::YUAN, 0.0);
-        assert_eq!(true, goods.contains(&yuan), "{:?} not found in goods", yuan);
+        assert!(goods.contains(&yuan), "{:?} not found in goods", yuan);
         let yen = Good::new(GoodKind::YEN, 0.0);
-        assert_eq!(true, goods.contains(&yen), "{:?} not found in goods", yen);
+        assert!(goods.contains(&yen), "{:?} not found in goods", yen);
     }
 
     #[test]
     fn test_transform_good_to_history_day() {
         // test with empty goods
-        let history = Trader::transform_good_to_history_day(12, &vec![]);
+        let history = Trader::transform_good_to_history_day(12, &[]);
         assert_eq!(12, history.day, "Day must be {}", 12);
         assert_eq!(0.0, history.eur, "EUR must be {}", 0.0);
         assert_eq!(0.0, history.usd, "USD must be {}", 0.0);
