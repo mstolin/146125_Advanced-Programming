@@ -715,6 +715,7 @@ mod tests {
     use crate::strategies::strategy::Strategy;
     use crate::MarketRef;
     use smse::Smse;
+    use std::cell::RefCell;
     use std::rc::Rc;
     use unitn_market_2022::good::good::Good;
     use unitn_market_2022::good::good_kind::GoodKind;
@@ -742,6 +743,20 @@ mod tests {
         let tase = TASE::new_random();
         let zse = ZSE::new_random();
         (sgx, smse, tase, zse)
+    }
+
+    fn init_inventory(
+        eur_quantity: f32,
+        usd_quantity: f32,
+        yen_quantity: f32,
+        yuan_quantity: f32,
+    ) -> Vec<Good> {
+        vec![
+            Good::new(GoodKind::EUR, eur_quantity),
+            Good::new(GoodKind::USD, usd_quantity),
+            Good::new(GoodKind::YEN, yen_quantity),
+            Good::new(GoodKind::YUAN, yuan_quantity),
+        ]
     }
 
     #[test]
@@ -1043,6 +1058,330 @@ mod tests {
             best_bid.market_name, best_usd_bid.market_name,
             "Best offer market for USD must be {}",
             best_bid.market_name
+        );
+    }
+
+    #[test]
+    fn test_find_good_to_lock_buy() {
+        let trader_name = "TRADER_NAME";
+        let strategy = MostSimpleStrategy::new(vec![], trader_name);
+        let allowed_kinds = vec![GoodKind::USD, GoodKind::YEN, GoodKind::YUAN];
+
+        // Test with all goods at 0.0 quantity
+        let inventory = init_inventory(0.0, 0.0, 0.0, 0.0);
+        let kind = strategy.find_good_to_lock_buy(&inventory);
+        assert_ne!(GoodKind::EUR, kind, "Kind to buy can never be EUR");
+        assert!(
+            allowed_kinds.contains(&kind),
+            "Kind can be USD, YEN, or YUAN"
+        );
+
+        // Test with only EUR at 0.0 quantity
+        let inventory = init_inventory(0.0, 100.0, 100.0, 100.0);
+        let kind = strategy.find_good_to_lock_buy(&inventory);
+        assert_ne!(GoodKind::EUR, kind, "Kind to buy can never be EUR");
+        assert!(
+            allowed_kinds.contains(&kind),
+            "Kind can be USD, YEN, or YUAN"
+        );
+
+        // Test with only YUAN at 0.0 quantity
+        let inventory = init_inventory(100.0, 0.0, 100.0, 0.0);
+        let kind = strategy.find_good_to_lock_buy(&inventory);
+        assert_ne!(GoodKind::EUR, kind, "Kind to buy can never be EUR");
+        assert!(
+            vec![GoodKind::USD, GoodKind::YUAN].contains(&kind),
+            "Kind must be USD or YUAN"
+        );
+
+        // Test with USD and YUAN at 0.0 quantity
+        let inventory = init_inventory(100.0, 100.0, 100.0, 0.0);
+        let kind = strategy.find_good_to_lock_buy(&inventory);
+        assert_ne!(GoodKind::EUR, kind, "Kind to buy can never be EUR");
+        assert_eq!(GoodKind::YUAN, kind, "Kind must be YUAN");
+    }
+
+    #[test]
+    fn test_allowed_to_buy() {
+        let trader_name = "TRADER_NAME";
+        let mut strategy = MostSimpleStrategy::new(vec![], trader_name);
+
+        // at first we are allowed to buy
+        assert!(
+            strategy.allowed_to_buy(),
+            "At first, the strategy must be allowed to buy"
+        );
+
+        strategy.buy_count = RefCell::new(6);
+        assert!(
+            !strategy.allowed_to_buy(),
+            "After {} buy operations and {} sell operations it should not be allowed to buy",
+            6,
+            0
+        );
+
+        strategy.sell_count = RefCell::new(6);
+        assert!(
+            strategy.allowed_to_buy(),
+            "After {} buy operations and {} sell operations it should not be allowed to buy",
+            6,
+            6
+        );
+
+        strategy.buy_count = RefCell::new(60);
+        strategy.sell_count = RefCell::new(10);
+        assert!(
+            !strategy.allowed_to_buy(),
+            "After {} buy operations and {} sell operations it should not be allowed to buy",
+            60,
+            10
+        );
+    }
+
+    #[test]
+    fn test_get_good_for_kind() {
+        let trader_name = "TRADER_NAME";
+        let strategy = MostSimpleStrategy::new(vec![], trader_name);
+        let inventory = init_inventory(0.0, 0.0, 0.0, 0.0);
+
+        let kinds = vec![GoodKind::EUR, GoodKind::USD, GoodKind::YEN, GoodKind::YUAN];
+        for kind in kinds.iter() {
+            let good = strategy.get_good_for_kind(kind, &inventory);
+            assert!(good.is_some(), "There must be a good for kind {}", kind);
+            let good = good.unwrap();
+            assert_eq!(*kind, good.get_kind(), "Good must be of kind {}", kind);
+            assert_eq!(0.0, good.get_qty(), "Quantity of good is 0.0");
+        }
+    }
+
+    #[test]
+    fn test_add_to_buy_history() {
+        let trader_name = "TRADER_NAME";
+        let strategy = MostSimpleStrategy::new(vec![], trader_name);
+
+        // initially everything must be empty
+        for (kind, hist) in strategy.buy_history.borrow().iter() {
+            assert!(hist.is_empty(), "History for {kind} should be empty");
+        }
+
+        // add goods to buy history
+        let kinds = vec![GoodKind::USD, GoodKind::YEN, GoodKind::YUAN];
+        for kind in kinds {
+            strategy.add_to_buy_history(&Good::new(kind, 10.0), 100.0);
+        }
+        for (kind, hist) in strategy.buy_history.borrow().iter() {
+            assert_eq!(1, hist.len(), "History length for {kind} should be 1");
+        }
+    }
+
+    #[test]
+    fn test_find_market_for_name() {
+        let trader_name = "TRADER_NAME";
+        let (sgx, smse, tase, zse) = init_random_markets();
+        let markets = vec![
+            Rc::clone(&sgx),
+            Rc::clone(&smse),
+            Rc::clone(&tase),
+            Rc::clone(&zse),
+        ];
+        let strategy = MostSimpleStrategy::new(markets, trader_name);
+
+        // Test SGX
+        let sgx_name = sgx.as_ref().borrow().get_name();
+        let sgx_2 = strategy.find_market_for_name(&sgx_name.to_string());
+        assert!(
+            sgx_2.is_some(),
+            "There must be a market for name '{}'",
+            sgx_name
+        );
+        let sgx_2_name = sgx_2.unwrap().as_ref().borrow().get_name();
+        assert_eq!(
+            sgx_name, sgx_2_name,
+            "Found name '{}' must be equal to '{}'",
+            sgx_2_name, sgx_name
+        );
+
+        // Test SMSE
+        let smse_name = smse.as_ref().borrow().get_name();
+        let smse_2 = strategy.find_market_for_name(&smse_name.to_string());
+        assert!(
+            smse_2.is_some(),
+            "There must be a market for name '{}'",
+            smse_name
+        );
+        let smse_2_name = smse_2.unwrap().as_ref().borrow().get_name();
+        assert_eq!(
+            smse_name, smse_2_name,
+            "Found name '{}' must be equal to '{}'",
+            smse_2_name, smse_name
+        );
+
+        // Test TASE
+        let tase_name = tase.as_ref().borrow().get_name();
+        let tase_2 = strategy.find_market_for_name(&tase_name.to_string());
+        assert!(
+            tase_2.is_some(),
+            "There must be a market for name '{}'",
+            tase_name
+        );
+        let tase_2_name = tase_2.unwrap().as_ref().borrow().get_name();
+        assert_eq!(
+            tase_name, tase_name,
+            "Found name '{}' must be equal to '{}'",
+            tase_2_name, tase_name
+        );
+
+        // Test ZSE
+        let zse_name = zse.as_ref().borrow().get_name();
+        let zse_2 = strategy.find_market_for_name(&zse_name.to_string());
+        assert!(
+            zse_2.is_some(),
+            "There must be a market for name '{}'",
+            zse_name
+        );
+        let zse_2_name = zse_2.unwrap().as_ref().borrow().get_name();
+        assert_eq!(
+            zse_name, zse_2_name,
+            "Found name '{}' must be equal to '{}'",
+            zse_2_name, zse_name
+        );
+    }
+
+    #[test]
+    fn test_clear_tokens() {
+        let trader_name = "TRADER_NAME";
+        let mut strategy = MostSimpleStrategy::new(vec![], trader_name);
+
+        // Initially no tokens should be available
+        assert!(
+            strategy.sell_tokens.borrow().is_empty(),
+            "Initially it must be empty"
+        );
+        assert!(
+            strategy.sold_tokens.borrow().is_empty(),
+            "Initially it must be empty"
+        );
+        assert!(
+            strategy.buy_tokens.borrow().is_empty(),
+            "Initially it must be empty"
+        );
+        assert!(
+            strategy.bought_tokens.borrow().is_empty(),
+            "Initially it must be empty"
+        );
+
+        let tokens = vec![
+            (
+                "TOKEN_A".to_string(),
+                Payment::new(10.0, 100.0, GoodKind::USD, "MARKET_A".to_string()),
+            ),
+            (
+                "TOKEN_B".to_string(),
+                Payment::new(10.0, 100.0, GoodKind::USD, "MARKET_B".to_string()),
+            ),
+        ];
+
+        // add the some tokens to both
+        for (token, payment) in tokens.iter() {
+            strategy
+                .sell_tokens
+                .borrow_mut()
+                .push((token.clone(), payment.clone()));
+            strategy.sold_tokens.borrow_mut().push(token.clone());
+            strategy
+                .buy_tokens
+                .borrow_mut()
+                .push((token.clone(), payment.clone()));
+            strategy.bought_tokens.borrow_mut().push(token.clone());
+        }
+
+        // Initially no tokens should be available
+        assert_eq!(
+            2,
+            strategy.sell_tokens.borrow().len(),
+            "Length must be 2 now"
+        );
+        assert_eq!(
+            2,
+            strategy.sold_tokens.borrow().len(),
+            "Length must be 2 now"
+        );
+        assert_eq!(
+            2,
+            strategy.buy_tokens.borrow().len(),
+            "Length must be 2 now"
+        );
+        assert_eq!(
+            2,
+            strategy.bought_tokens.borrow().len(),
+            "Length must be 2 now"
+        );
+
+        strategy.clear_sold_tokens();
+        strategy.clear_bought_tokens();
+
+        assert!(
+            strategy.sell_tokens.borrow().is_empty(),
+            "After clear, history must be empty"
+        );
+        assert!(
+            strategy.buy_tokens.borrow().is_empty(),
+            "After clear, history must be empty"
+        );
+
+        // clear completely
+        strategy.sold_tokens = RefCell::new(vec![]);
+        strategy.bought_tokens = RefCell::new(vec![]);
+
+        // add only one token to sold/bought tokens
+        for (index, (token, payment)) in tokens.iter().enumerate() {
+            if index % 2 == 0 {
+                strategy.sold_tokens.borrow_mut().push(token.clone());
+                strategy.bought_tokens.borrow_mut().push(token.clone());
+            }
+            strategy
+                .sell_tokens
+                .borrow_mut()
+                .push((token.clone(), payment.clone()));
+            strategy
+                .buy_tokens
+                .borrow_mut()
+                .push((token.clone(), payment.clone()));
+        }
+
+        assert_eq!(
+            2,
+            strategy.sell_tokens.borrow().len(),
+            "Length must be 2 now"
+        );
+        assert_eq!(
+            1,
+            strategy.sold_tokens.borrow().len(),
+            "Length must be 1 now"
+        );
+        assert_eq!(
+            2,
+            strategy.buy_tokens.borrow().len(),
+            "Length must be 2 now"
+        );
+        assert_eq!(
+            1,
+            strategy.bought_tokens.borrow().len(),
+            "Length must be 1 now"
+        );
+
+        strategy.clear_sold_tokens();
+        strategy.clear_bought_tokens();
+
+        assert_eq!(
+            1,
+            strategy.sell_tokens.borrow().len(),
+            "After clear, length must be 1"
+        );
+        assert_eq!(
+            1,
+            strategy.buy_tokens.borrow().len(),
+            "After clear, length must be 1"
         );
     }
 }
