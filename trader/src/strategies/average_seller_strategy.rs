@@ -44,7 +44,7 @@ impl Payment {
     }
 }
 
-pub struct MostSimpleStrategy {
+pub struct AverageSellerStrategy {
     /// Name of the trader using this strategy
     trader_name: String,
     /// All markets this strategy works with
@@ -68,7 +68,7 @@ pub struct MostSimpleStrategy {
 }
 
 /// Buying methods
-impl MostSimpleStrategy {
+impl AverageSellerStrategy {
     /// Returns a boolean that represents if a buy operation is allowed at the moment.
     /// A buy operation may be disallowed, if the absolute difference between the number of
     /// sell and buy operations is lower than the number defined as [`max_diff_count_operations`].
@@ -342,7 +342,7 @@ impl MostSimpleStrategy {
 }
 
 /// Selling Methods
-impl MostSimpleStrategy {
+impl AverageSellerStrategy {
     /// Tries to find an adequate offer for given good (a good that this trader has bought) and at
     /// the wanted market.
     /// An offer is considered adequate, when the price per piece is below than the price per piece
@@ -596,7 +596,7 @@ impl MostSimpleStrategy {
 }
 
 /// Helper methods
-impl MostSimpleStrategy {
+impl AverageSellerStrategy {
     /// Builds a default buy history that contains all tradable goods.
     fn init_default_buy_history() -> BuyHistory {
         // don't care about EUR
@@ -656,14 +656,14 @@ impl MostSimpleStrategy {
 }
 
 /// Strategy trait implementation
-impl Strategy for MostSimpleStrategy {
+impl Strategy for AverageSellerStrategy {
     fn new(markets: Vec<MarketRef>, trader_name: &str) -> Self {
         Self {
             trader_name: trader_name.to_string(),
             markets,
             buy_tokens: RefCell::new(Vec::new()),
             bought_tokens: RefCell::new(Vec::new()),
-            buy_history: RefCell::new(MostSimpleStrategy::init_default_buy_history()),
+            buy_history: RefCell::new(AverageSellerStrategy::init_default_buy_history()),
             sell_tokens: RefCell::new(Vec::new()),
             sold_tokens: RefCell::new(Vec::new()),
             sell_count: RefCell::new(0),
@@ -711,7 +711,7 @@ impl Strategy for MostSimpleStrategy {
 
 #[cfg(test)]
 mod tests {
-    use crate::strategies::most_simple_strategy::{MostSimpleStrategy, Payment};
+    use crate::strategies::average_seller_strategy::{AverageSellerStrategy, Payment};
     use crate::strategies::strategy::Strategy;
     use crate::MarketRef;
     use smse::Smse;
@@ -764,7 +764,7 @@ mod tests {
         let trader_name = "TRADER_NAME";
         let (sgx, _, _, _) = init_random_markets();
         let markets = vec![Rc::clone(&sgx)];
-        let strategy = MostSimpleStrategy::new(markets, trader_name);
+        let strategy = AverageSellerStrategy::new(markets, trader_name);
 
         // test for eur
         let good = Good::new(GoodKind::EUR, 100.0);
@@ -818,7 +818,7 @@ mod tests {
         let trader_name = "TRADER_NAME";
         let (_, smse, tase, _) = init_markets(0.0, 100_000.0, 0.0, 0.0);
         let markets = vec![Rc::clone(&smse), Rc::clone(&tase)];
-        let strategy = MostSimpleStrategy::new(markets, trader_name);
+        let strategy = AverageSellerStrategy::new(markets, trader_name);
 
         // test for eur
         let offer = strategy.find_adequate_bid(Rc::clone(&smse), 100.0, &GoodKind::EUR);
@@ -870,7 +870,7 @@ mod tests {
     #[test]
     fn test_filter_best_offers() {
         let trader_name = "TRADER_NAME";
-        let strategy = MostSimpleStrategy::new(Vec::new(), trader_name);
+        let strategy = AverageSellerStrategy::new(Vec::new(), trader_name);
 
         // test with empty offers
         let best_offers = strategy.filter_best_offers(&[]);
@@ -1013,7 +1013,7 @@ mod tests {
         let trader_name = "TRADER_NAME";
         let (sgx, _, _, _) = init_markets(0.0, 100_000.0, 0.0, 0.0);
         let markets = vec![Rc::clone(&sgx)];
-        let strategy = MostSimpleStrategy::new(markets, trader_name);
+        let strategy = AverageSellerStrategy::new(markets, trader_name);
 
         // test with eur
         let bids = strategy.find_adequate_bids(&GoodKind::EUR, 100_000.0, |_, _, _| None);
@@ -1064,7 +1064,7 @@ mod tests {
     #[test]
     fn test_find_good_to_lock_buy() {
         let trader_name = "TRADER_NAME";
-        let strategy = MostSimpleStrategy::new(vec![], trader_name);
+        let strategy = AverageSellerStrategy::new(vec![], trader_name);
         let allowed_kinds = vec![GoodKind::USD, GoodKind::YEN, GoodKind::YUAN];
 
         // Test with all goods at 0.0 quantity
@@ -1104,7 +1104,7 @@ mod tests {
     #[test]
     fn test_allowed_to_buy() {
         let trader_name = "TRADER_NAME";
-        let mut strategy = MostSimpleStrategy::new(vec![], trader_name);
+        let mut strategy = AverageSellerStrategy::new(vec![], trader_name);
 
         // at first we are allowed to buy
         assert!(
@@ -1141,7 +1141,7 @@ mod tests {
     #[test]
     fn test_get_good_for_kind() {
         let trader_name = "TRADER_NAME";
-        let strategy = MostSimpleStrategy::new(vec![], trader_name);
+        let strategy = AverageSellerStrategy::new(vec![], trader_name);
         let inventory = init_inventory(0.0, 0.0, 0.0, 0.0);
 
         let kinds = vec![GoodKind::EUR, GoodKind::USD, GoodKind::YEN, GoodKind::YUAN];
@@ -1157,7 +1157,7 @@ mod tests {
     #[test]
     fn test_add_to_buy_history() {
         let trader_name = "TRADER_NAME";
-        let strategy = MostSimpleStrategy::new(vec![], trader_name);
+        let strategy = AverageSellerStrategy::new(vec![], trader_name);
 
         // initially everything must be empty
         for (kind, hist) in strategy.buy_history.borrow().iter() {
@@ -1184,7 +1184,7 @@ mod tests {
             Rc::clone(&tase),
             Rc::clone(&zse),
         ];
-        let strategy = MostSimpleStrategy::new(markets, trader_name);
+        let strategy = AverageSellerStrategy::new(markets, trader_name);
 
         // Test SGX
         let sgx_name = sgx.as_ref().borrow().get_name();
@@ -1250,7 +1250,7 @@ mod tests {
     #[test]
     fn test_clear_tokens() {
         let trader_name = "TRADER_NAME";
-        let mut strategy = MostSimpleStrategy::new(vec![], trader_name);
+        let mut strategy = AverageSellerStrategy::new(vec![], trader_name);
 
         // Initially no tokens should be available
         assert!(

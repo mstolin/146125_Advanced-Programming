@@ -5,9 +5,9 @@ agent on certain markets.
 
 ## Available Strategies
 
-| Strategy                                      | Author        |
-|-----------------------------------------------|---------------|
-| [MostSimpleStrategy](./MostSimpleStrategy.md) | Marcel Stolin |
+| Identifier                          | File                                                                    | Author        | Description                                            |
+|-------------------------------------|-------------------------------------------------------------------------|---------------|--------------------------------------------------------|
+| `StrategyIdentifier::AverageSeller` | [average_seller_strategy.rs](src/strategies/average_seller_strategy.rs) | Marcel Stolin | [AverageSellerStrategy.md](./AverageSellerStrategy.md) |
 
 ## Usage
 
@@ -16,7 +16,7 @@ let sgx = SGX::new_random();
 let markets = vec![Rc::clone(&sgx)];
 
 let trader = Trader::from(
-    StrategyIdentifier::Most_Simple,
+    StrategyIdentifier::AverageSeller,
     1_000_000.0,
     markets,
 );

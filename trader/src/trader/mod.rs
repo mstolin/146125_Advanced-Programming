@@ -1,5 +1,5 @@
-use crate::consts::TRADER_NAME_MOST_SIMPLE;
-use crate::strategies::most_simple_strategy::MostSimpleStrategy;
+use crate::consts::TRADER_NAME_AVERAGE_SELLER;
+use crate::strategies::average_seller_strategy::AverageSellerStrategy;
 use crate::strategies::strategy::Strategy;
 use crate::MarketRef;
 use env_logger::Env;
@@ -11,7 +11,7 @@ use unitn_market_2022::good::good_kind::GoodKind;
 
 #[derive(Clone, Debug, Eq, Ord, PartialOrd, PartialEq)]
 pub enum StrategyIdentifier {
-    MostSimple,
+    AverageSeller,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -72,8 +72,8 @@ impl Trader {
         trader_name: &str,
     ) -> Box<dyn Strategy> {
         match id {
-            StrategyIdentifier::MostSimple => {
-                Box::new(MostSimpleStrategy::new(markets, trader_name))
+            StrategyIdentifier::AverageSeller => {
+                Box::new(AverageSellerStrategy::new(markets, trader_name))
             }
         }
     }
@@ -81,7 +81,7 @@ impl Trader {
     /// Returns the name of the trader for the given strategy identifier.
     fn get_name_for_strategy(id: StrategyIdentifier) -> &'static str {
         match id {
-            StrategyIdentifier::MostSimple => TRADER_NAME_MOST_SIMPLE,
+            StrategyIdentifier::AverageSeller => TRADER_NAME_AVERAGE_SELLER,
         }
     }
 
@@ -119,7 +119,7 @@ impl Trader {
         let _ = env_logger::try_init_from_env(env);
 
         // init default goods
-        let name = Self::get_name_for_strategy(StrategyIdentifier::MostSimple);
+        let name = Self::get_name_for_strategy(StrategyIdentifier::AverageSeller);
         let strategy = Self::init_strategy(strategy_id, markets, name);
         let goods = Self::create_goods(start_capital);
         let history = Vec::from([Self::transform_good_to_history_day(0, &goods)]);
@@ -216,7 +216,7 @@ impl Trader {
 
 #[cfg(test)]
 mod tests {
-    use crate::consts::TRADER_NAME_MOST_SIMPLE;
+    use crate::consts::TRADER_NAME_AVERAGE_SELLER;
     use crate::trader::{StrategyIdentifier, Trader};
     use crate::MarketRef;
     use smse::Smse;
@@ -250,8 +250,8 @@ mod tests {
         ];
 
         // test if it works
-        let trader = Trader::from(StrategyIdentifier::MostSimple, 300_000.0, markets);
-        let trader_name = Trader::get_name_for_strategy(StrategyIdentifier::MostSimple);
+        let trader = Trader::from(StrategyIdentifier::AverageSeller, 300_000.0, markets);
+        let trader_name = Trader::get_name_for_strategy(StrategyIdentifier::AverageSeller);
         assert_eq!(
             trader_name,
             trader.get_name(),
@@ -281,13 +281,13 @@ mod tests {
             Rc::clone(&tase),
             Rc::clone(&zse),
         ];
-        Trader::from(StrategyIdentifier::MostSimple, 0.0, markets);
+        Trader::from(StrategyIdentifier::AverageSeller, 0.0, markets);
     }
 
     #[test]
     #[should_panic]
     fn test_new_trader_with_no_markets() {
-        Trader::from(StrategyIdentifier::MostSimple, 300_000.0, vec![]);
+        Trader::from(StrategyIdentifier::AverageSeller, 300_000.0, vec![]);
     }
 
     #[test]
@@ -360,7 +360,7 @@ mod tests {
         let (sgx, smse, tase, _zse) = init_random_markets();
         let markets = vec![Rc::clone(&sgx), Rc::clone(&smse), Rc::clone(&tase)];
 
-        let trader = Trader::from(StrategyIdentifier::MostSimple, 1_000_000.0, markets);
+        let trader = Trader::from(StrategyIdentifier::AverageSeller, 1_000_000.0, markets);
         trader.apply_strategy(0, 0);
     }
 
@@ -370,7 +370,7 @@ mod tests {
         let (sgx, smse, tase, _zse) = init_random_markets();
         let markets = vec![Rc::clone(&sgx), Rc::clone(&smse), Rc::clone(&tase)];
 
-        let trader = Trader::from(StrategyIdentifier::MostSimple, 1_000_000.0, markets);
+        let trader = Trader::from(StrategyIdentifier::AverageSeller, 1_000_000.0, markets);
         trader.apply_strategy(7, 0);
     }
 
@@ -381,13 +381,16 @@ mod tests {
         let markets = vec![Rc::clone(&sgx), Rc::clone(&smse), Rc::clone(&tase)];
         let minutes = 24 * 60;
 
-        let trader = Trader::from(StrategyIdentifier::MostSimple, 1_000_000.0, markets);
+        let trader = Trader::from(StrategyIdentifier::AverageSeller, 1_000_000.0, markets);
         trader.apply_strategy(7, minutes + 1);
     }
 
     #[test]
     fn test_get_name_for_strategy() {
-        let expected = HashMap::from([(TRADER_NAME_MOST_SIMPLE, StrategyIdentifier::MostSimple)]);
+        let expected = HashMap::from([(
+            TRADER_NAME_AVERAGE_SELLER,
+            StrategyIdentifier::AverageSeller,
+        )]);
 
         for (expected_name, id) in expected {
             let name = Trader::get_name_for_strategy(id.clone());
@@ -400,7 +403,7 @@ mod tests {
     }
 
     #[test]
-    fn test_apply_simple_strategy_for_one_week() {
+    fn test_apply_average_seller_strategy_for_one_week() {
         let days = 7;
         let (sgx, smse, tase, _zse) = init_random_markets();
         let markets = vec![
@@ -410,7 +413,7 @@ mod tests {
             //Rc::clone(&zse), // Total "out-of-the-world" offers
         ];
 
-        let trader = Trader::from(StrategyIdentifier::MostSimple, 1_000_000.0, markets);
+        let trader = Trader::from(StrategyIdentifier::AverageSeller, 1_000_000.0, markets);
 
         assert_eq!(0, trader.get_days(), "Trader should not have started now");
         trader.apply_strategy(7, 60);

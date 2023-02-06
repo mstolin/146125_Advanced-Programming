@@ -1,4 +1,4 @@
-# MostSimpleStrategy
+# AverageSellerStrategy
 
 ## Buying strategy
 
