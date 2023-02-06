@@ -16,7 +16,7 @@ type MarketRef = Rc<RefCell<dyn Market>>;
 #[clap(about, author, version)]
 pub struct Args {
     /// Name of the strategy the trader is supposed to use.
-    /// Available strategy names: mostsimple.
+    /// Available strategy names: average-seller.
     pub strategy: String,
     /// List of markets the trader should work with.
     /// Available market names: sgx, smse, tase, zse.
@@ -86,7 +86,7 @@ fn parse_markets(markets: &[String]) -> Vec<MarketRef> {
 /// Tries to map the given strategy name to a `StrategyIdentifier`.
 fn map_strategy_to_id(strategy: &str) -> Option<StrategyIdentifier> {
     match strategy {
-        "mostsimple" => Some(StrategyIdentifier::MostSimple),
+        "average-seller" => Some(StrategyIdentifier::AverageSeller),
         _ => None,
     }
 }
@@ -118,7 +118,7 @@ fn main() {
         }
     } else {
         println!(
-            "No strategy called '{}' available. Try mostsimple.",
+            "No strategy called '{}' available. Try average-seller.",
             args.strategy
         );
         std::process::exit(1);
@@ -137,7 +137,7 @@ mod tests {
         assert_eq!(
             0,
             markets.len(),
-            "No markets should be geenrated for an empty slice"
+            "No markets should be generated for an empty slice"
         );
 
         // Test with no existing markets
@@ -185,8 +185,8 @@ mod tests {
         );
 
         // test existing strategy
-        let strategy = "mostsimple";
-        let expected = StrategyIdentifier::MostSimple;
+        let strategy = "average-seller";
+        let expected = StrategyIdentifier::AverageSeller;
         let id = map_strategy_to_id(strategy);
         assert_eq!(
             Some(expected.clone()),
