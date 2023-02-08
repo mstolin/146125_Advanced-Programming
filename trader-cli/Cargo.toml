@@ -8,7 +8,7 @@ authors = ["Farid Ouedraogo, Marcel Stolin, Sebastiano Cassol, Jacopo Clocchiatt
 clap = { version = "4.0.32", features = ["derive"] }
 env_logger = "0.10.0"
 log = "0.4.17"
-SGX = { version = "0.1.4", registry = "kellnr" }
+SGX = { version = "0.1.5", registry = "kellnr" }
 smse = { version = "1.0.1", registry = "kellnr" }
 TASE = { version = "0.1.2", registry = "kellnr" }
 trader = { path = "../trader" }
