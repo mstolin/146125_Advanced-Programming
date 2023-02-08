@@ -73,27 +73,22 @@ pub struct Args {
     pub print_history: bool,
 }
 
-/// The `MarketFactory` is responsible to generate a `MarketRef` instance
-/// for a given name.
-struct MarketFactory();
-
-impl MarketFactory {
-    /// Generates a random market instance for the given name.
-    /// Currently the markets sgx, smse, tase, and zse are available.
-    fn gen_market(market_name: &str) -> Option<MarketRef> {
-        let market_name = market_name.to_ascii_lowercase();
-        match market_name.as_str() {
-            "sgx" => Some(SGX::new_random()),
-            "smse" => Some(Smse::new_random()),
-            "tase" => Some(TASE::new_random()),
-            "zse" => Some(ZSE::new_random()),
-            _ => None,
-        }
+/// Generates a [`MarketRef`] instance if the given is valid, otherwise
+/// it returns `None`. The market contains random quantities.
+/// Valid names for markets are: `sgx`, `smse`, `tase`, and `zse`.
+fn gen_market(market_name: &str) -> Option<MarketRef> {
+    let market_name = market_name.to_ascii_lowercase();
+    match market_name.as_str() {
+        "sgx" => Some(SGX::new_random()),
+        "smse" => Some(Smse::new_random()),
+        "tase" => Some(TASE::new_random()),
+        "zse" => Some(ZSE::new_random()),
+        _ => None,
     }
 }
 
-/// Parses the given market names and returns a `MarketRef` if
-/// available. it uses the [`MarketFactory`](MarketFactory) to
+/// Parses the given market names and returns a [`MarketRef`] if
+/// available. it uses the [`gen_market`] method to
 /// generate a market.
 fn parse_markets(markets: &[String]) -> Vec<MarketRef> {
     let mut market_refs = Vec::new();
@@ -113,7 +108,8 @@ fn parse_markets(markets: &[String]) -> Vec<MarketRef> {
     market_refs
 }
 
-/// Tries to map the given strategy name to a `StrategyIdentifier`.
+/// Tries to map the given strategy name to an optional [`StrategyIdentifier`].
+/// Valid strategy names: `average-seller`.
 fn map_strategy_to_id(strategy: &str) -> Option<StrategyIdentifier> {
     match strategy {
         "average-seller" => Some(StrategyIdentifier::AverageSeller),
