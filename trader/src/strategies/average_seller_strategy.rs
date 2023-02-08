@@ -1,3 +1,36 @@
+//! This strategy tries to buy the cheapest goods available, and the sell
+//! them, for them for a higher price than the average buy price per piece.
+//!
+//! # Buying Strategy
+//!
+//! This strategy always tries to buy the cheapest good available. The problems that arise with
+//! that strategy is:
+//!
+//! 1. What good do we buy
+//! 2. At what max. price to we buy
+//! 3. What quantity do we buy
+//! 4. How do we stop the trader to buy (spent all the available EUR)
+//!
+//! The selection of the good to buy is simple: Just select the good with the lowest owned
+//! quantity. The assumptions are, if the quantity is low, then markets own a lot of that good
+//! and price is cheap.
+//!
+//! To solve the second problem, the strategy is allowed to pay at max. 30% of the owned EUR
+//! quantity. 30% because there are 3 different goods to buy.
+//!
+//! For the second problem, the strategy tries to find the highest quantity for the max. price.
+//!
+//! To stop the trader to spent all EUR, the strategy has a specific threshold of allowed buy
+//! operations. This threshold depends on the sell operations. The difference between a buy
+//! and a sell operations is not allowed to be higher than *n* (e.g. 5). If the trader has
+//! performed *n* more buy operations than sell operations, the trader is not allowed to buy,
+//! and it is expected that the trader sells before buying again.
+//!
+//! # Selling Strategy
+//!
+//! The strategy for selling is simple: Just sell at a higher price than bought. To do that, it
+//! calculates the average price for one piece of the good paid by now and compares that with the
+//! sell price for one a single piece given by market. If found, sell as much as possible.
 use crate::strategies::strategy::Strategy;
 use crate::MarketRef;
 use log::{info, warn};
@@ -14,26 +47,27 @@ use unitn_market_2022::good::good_kind::GoodKind;
 use unitn_market_2022::market::{LockSellError, Market};
 
 /// This type represents the history for either buy or sell tokens.
-/// Each token has a corresponding offer or bid (as instance of `Payment`).
+/// Each token has a corresponding offer or bid (as instance of [`Payment`]).
 type TokenHistory = (String, Payment);
-/// This type represents the buy history: kind: (buy_price, bought_quantity)
+/// This type represents the buy history; { [`GoodKind`]: (buy_price, bought_quantity) }
 type BuyHistory = HashMap<GoodKind, Vec<(f32, f32)>>;
 
 #[derive(Clone, Debug)]
-/// A `Payment` either represents an offer of market or bid from the trader for a good.
+/// A `Payment` instance either represents an offer of a market or a bid
+/// from the trader for a good.
 struct Payment {
     /// The offer or bid
     price: f32,
     /// Quantity to sell or buy
     quantity: f32,
-    /// Kind of the good this payment is about
+    /// [`GoodKind`] of the good this payment is about
     good_kind: GoodKind,
     /// The market that accepted/created this payment
     market_name: String,
 }
 
 impl Payment {
-    /// Constructs a new `Payment` instance
+    /// Constructs a new [`Payment`] instance
     fn new(price: f32, quantity: f32, good_kind: GoodKind, market_name: String) -> Self {
         Self {
             price,
@@ -44,6 +78,7 @@ impl Payment {
     }
 }
 
+/// The implementation of the `AverageSellerStrategy`.
 pub struct AverageSellerStrategy {
     /// Name of the trader using this strategy
     trader_name: String,
@@ -71,10 +106,10 @@ pub struct AverageSellerStrategy {
 impl AverageSellerStrategy {
     /// Returns a boolean that represents if a buy operation is allowed at the moment.
     /// A buy operation may be disallowed, if the absolute difference between the number of
-    /// sell and buy operations is lower than the number defined as [`max_diff_count_operations`].
+    /// sell and buy operations is lower than the number defined as `max_diff_count_operations`.
     ///
     /// For example:
-    /// [`max_diff_count_operations`] = 5, `buy_operations` = 4, `sell_operations` = 2.
+    /// `max_diff_count_operations` = 5, `buy_operations` = 4, `sell_operations` = 2.
     /// Then, the difference is 2 (< allowed diff) so a buy is allowed.
     ///
     /// This is done to prevent the trader (using this strategy) to buy all time, or in other words
@@ -139,7 +174,7 @@ impl AverageSellerStrategy {
     }
 
     /// This method tries to find an adequate bid for every given market. It requires a predicate
-    /// function as parameter. By default, this should be [`find_adequate_bid`].
+    /// function as parameter. By default, this should be [`AverageSellerStrategy::find_adequate_bid`].
     fn find_adequate_bids<P>(
         &self,
         good_kind: &GoodKind,
@@ -262,10 +297,10 @@ impl AverageSellerStrategy {
         }
     }
 
-    /// This methods tries to buy all goods that have been locked in [`buy_tokens`].
+    /// This methods tries to buy all goods that have been locked in `buy_tokens`.
     /// If a buy wasn't successful, it will retry a second time with an updated price.
     /// The updated price is usually received by the error message.
-    /// After the buy was successful, the bid is added to the [`buy_history`].
+    /// After the buy was successful, the bid is added to the `buy_history`.
     fn buy_locked_goods(&self, inventory: &mut [Good]) {
         if !self.allowed_to_buy() {
             warn!("Not allowed to buy");
@@ -309,7 +344,7 @@ impl AverageSellerStrategy {
         }
     }
 
-    /// This method adds the bought good and the payed price to the [`buy_history`].
+    /// This method adds the bought good and the payed price to the `buy_history`.
     /// Call this method after a successful buy.
     fn add_to_buy_history(&self, bought_good: &Good, bid: f32) {
         let mut buy_history = self.buy_history.borrow_mut();
@@ -321,8 +356,8 @@ impl AverageSellerStrategy {
         }
     }
 
-    /// This clears all token that have been bought. Bought tokens are saved in [`bought_tokens`].
-    /// If [`buy_tokens`] contains the same token, it will be removed.
+    /// This clears all token that have been bought. Bought tokens are saved in `bought_tokens`.
+    /// If `buy_tokens` contains the same token, it will be removed.
     fn clear_bought_tokens(&self) {
         let mut buy_tokens = self.buy_tokens.borrow_mut();
         let bought_tokens = self.bought_tokens.borrow();
@@ -394,7 +429,7 @@ impl AverageSellerStrategy {
 
     /// This method tries to find adequate offers for all given markets.
     /// As parameter, it takes a function that is being executed to find an adequate offer for a
-    /// specific market. By default this is [`find_adequate_offer`].
+    /// specific market. By default this is [`AverageSellerStrategy::find_adequate_offer`].
     fn find_offers_for_markets<P>(&self, inventory: &[Good], find_adequate_offer: P) -> Vec<Payment>
     where
         P: Fn(MarketRef, &Good) -> Option<Payment>,
@@ -530,7 +565,7 @@ impl AverageSellerStrategy {
         // todo: Is this necessary?
     }
 
-    /// This method tries to sell all locked goods, where a token is found in [`sell_tokens`].
+    /// This method tries to sell all locked goods, where a token is found in `sell_tokens`.
     /// After a successful sell, it increases the trader EUR quantity and adds the offer (as
     /// negative numbers) to the buy history.
     fn sell_locked_goods(&self, inventory: &mut [Good]) {
@@ -578,7 +613,7 @@ impl AverageSellerStrategy {
     }
 
     // todo this redundant
-    /// This method clears all token from [`sell_tokens`] that are contained in [`sold_tokens`].
+    /// This method clears all token from `sell_tokens` that are contained in `sold_tokens`.
     fn clear_sold_tokens(&self) {
         let mut sell_tokens = self.sell_tokens.borrow_mut();
         let sold_tokens = self.sold_tokens.borrow();

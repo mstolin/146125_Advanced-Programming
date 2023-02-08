@@ -56,7 +56,7 @@ impl Trader {
     /// Creates a vec with all available goods (EUR, USD, YEN, YUAN).
     /// By default, all goods have a quantity of 0.0. Except EUR, that
     /// starts with the given default quantity that is initially defined
-    /// in [`from`](from).
+    /// in [`Trader::from`].
     fn create_goods(default_quantity: f32) -> Vec<Good> {
         let eur = Good::new(GoodKind::EUR, default_quantity);
         let usd = Good::new(GoodKind::USD, 0.0);
