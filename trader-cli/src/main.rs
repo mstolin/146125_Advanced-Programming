@@ -1,3 +1,32 @@
+//! This is a CLI tool to execute a trader using the *trader* library.
+//!
+//! # Installation
+//!
+//! From the workspace directory execute the following:
+//!
+//! ```shell
+//! $ cargo install --path ./trader-cli
+//! ```
+//!
+//! After that, you can use the command as `$ trader-cli`.
+//!
+//! # Usage
+//!
+//! To see its features, execute `$ trader-cli --help`.
+//!
+//! # Examples
+//!
+//! *Run `AverageSeller` for 30 days, every 60 minutes on SGX and TASE and print history as JSON*
+//! ```shell
+//! $ trader-cli average-seller sgx tase -d 30 -m 60 --as-json
+//! ```
+//!
+//! *Run `AverageSeller` for 7 days, every 10 minutes on SGX, SMSE, and TASE wth 30.000.00 EUR start capital, and print history
+//! as plain text*
+//! ```shell
+//! $ trader-cli average-seller sgx smse tase -d 7 -m 10 -c 3000000
+//! ```
+
 use clap::Parser;
 use env_logger::Env;
 use smse::Smse;
