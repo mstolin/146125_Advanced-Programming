@@ -41,6 +41,7 @@ use ZSE::market::ZSE;
 /// Represents a market
 type MarketRef = Rc<RefCell<dyn Market>>;
 
+/// Possible arguments for the executable.
 #[derive(Debug, Parser)]
 #[clap(about, author, version)]
 pub struct Args {
@@ -120,6 +121,7 @@ fn map_strategy_to_id(strategy: &str) -> Option<StrategyIdentifier> {
     }
 }
 
+/// Main endpoint for the executable.
 fn main() {
     let args = Args::parse();
 
