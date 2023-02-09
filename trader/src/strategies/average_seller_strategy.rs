@@ -11,14 +11,27 @@
 //! 3. What quantity do we buy
 //! 4. How do we stop the trader to buy (spent all the available EUR)
 //!
+//! ## 1. What Good to buy
+//!
 //! The selection of the good to buy is simple: Just select the good with the lowest owned
-//! quantity. The assumptions are, if the quantity is low, then markets own a lot of that good
-//! and price is cheap.
+//! quantity. The assumptions are; if the quantity is low, then markets own a lot of that good
+//! and/or this good hasn't been bought a lot. Therefore, the good is cheap to buy.
 //!
-//! To solve the second problem, the strategy is allowed to pay at max. 30% of the owned EUR
-//! quantity. 30% because there are 3 different goods to buy.
+//! ## 2. How to choose the max. EUR price to buy
 //!
-//! For the second problem, the strategy tries to find the highest quantity for the max. price.
+//! To solve the second problem, the strategy follows a more static approach.
+//! It is allowed to pay at max. 30% of the owned EUR quantity. 30% because there are 3 different
+//! goods to buy.
+//!
+//! ## 3. How much do we buy?
+//!
+//! After a good and a quantity of EUR has been chosen, the strategy has to find out, what is the
+//! max. quantity of the selected good it can buy. The problem is, the market can only tell the buy
+//! price for a specific quantity. It can't tell, how much does a specific quantity cost. Therefore,
+//! the strategy has to try different quantities, until it has found the quantity for a price that
+//! as near as possible to the max. allowed EUR price.
+//!
+//! ## 4. How to stop the trader from spending all EURs
 //!
 //! To stop the trader to spent all EUR, the strategy has a specific threshold of allowed buy
 //! operations. This threshold depends on the sell operations. The difference between a buy
@@ -28,9 +41,17 @@
 //!
 //! # Selling Strategy
 //!
-//! The strategy for selling is simple: Just sell at a higher price than bought. To do that, it
-//! calculates the average price for one piece of the good paid by now and compares that with the
-//! sell price for one a single piece given by market. If found, sell as much as possible.
+//! After the trader has bought goods, other than EUR, the trader also needs to sell them in way
+//! to increase profit.
+//!
+//! This strategy tries to sell at a higher price than bought. It achieves this, by comparing the
+//! average buy price for a single price of a good with the price for a single piece of an offer
+//! from a market. If the price per piece of a market is higher, than this offer is considered
+//! adequate. Then, the strategy compares all adequate offers (for a good) and chooses the one
+//! with the highest profit.
+//!
+//! The problem that arise with this strategy is, how does the strategy find the highest quantity
+//! to sell, for the highest profit.
 use crate::strategies::strategy::Strategy;
 use crate::MarketRef;
 use log::{info, warn};

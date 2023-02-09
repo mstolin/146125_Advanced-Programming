@@ -412,7 +412,7 @@ mod tests {
     #[test]
     fn test_apply_average_seller_strategy_for_one_week() {
         let days = 7;
-        let (sgx, smse, tase, _zse) = init_random_markets();
+        let (sgx, smse, tase, _) = init_random_markets();
         let markets = vec![
             Rc::clone(&sgx),
             Rc::clone(&smse),
@@ -423,7 +423,7 @@ mod tests {
         let trader = Trader::from(StrategyIdentifier::AverageSeller, 1_000_000.0, markets);
 
         assert_eq!(0, trader.get_days(), "Trader should not have started now");
-        trader.apply_strategy(7, 60);
+        trader.apply_strategy(days, 60);
         assert_eq!(
             days,
             trader.get_days(),
