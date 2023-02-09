@@ -162,34 +162,41 @@ impl AverageSellerStrategy {
 
         let market = market.as_ref().borrow();
 
-        // start with max available quantity
         let market_goods = market.get_goods();
-        let mut tried_qty = market_goods
+        let max_quantity = market_goods
             .iter()
             .find(|g| g.good_kind == *kind)
             .map(|g| g.quantity)
-            .unwrap_or_default();
-        let max_tries = (tried_qty / 2.0) as u32; // todo: There has to be a better solution
-        let mut tries = 0;
+            .unwrap_or_default() as i32;
+        let steps = self.get_quantity_steps(max_quantity);
+        let quantities: Vec<i32> = (0..max_quantity).step_by(steps).collect();
+        if quantities.is_empty() {
+            return None;
+        }
+        let mut current_index = quantities.len() - 1;
 
-        while tries < max_tries {
-            let buy_price = market.get_buy_price(*kind, tried_qty);
+        // Don't check the last index (0) because it has the quantity 0.0
+        while current_index > 0 {
+            let quantity = match quantities.get(current_index) {
+                Some(qty) => *qty as f32,
+                _ => 0.0,
+            };
+
+            let buy_price = market.get_buy_price(*kind, quantity);
             if let Ok(buy_price) = buy_price {
                 if buy_price.is_subnormal() {
-                    return None;
+                    current_index -= 1;
+                    continue;
                 }
 
                 if buy_price <= max_eur {
                     // buy price is below our maximum bid
                     let market_name = market.get_name().to_string();
-                    return Some(Payment::new(buy_price, tried_qty, *kind, market_name));
+                    return Some(Payment::new(buy_price, quantity, *kind, market_name));
                 }
             }
 
-            // reduce the qty if no adequate price was found
-            let s = tried_qty / 2.0; // to go below zero, this has to be higher than the half
-            tried_qty -= s; // todo check for a more fine grained solution
-            tries += 1;
+            current_index -= 1;
         }
         None
     }
@@ -411,14 +418,27 @@ impl AverageSellerStrategy {
         let market = market.as_ref().borrow();
         let average_buy_price = self.get_avg_buy_price_per_piece(&good.get_kind());
 
-        // By default, start with max quantity available
-        let mut quantity = good.get_qty();
-        let max_tries = (quantity / 2.0) as u32; // todo: There has to be a better solution
-        let mut tries: u32 = 0;
+        let max_quantity = good.get_qty() as i32;
+        let steps = self.get_quantity_steps(max_quantity);
+        let quantities: Vec<i32> = (0..max_quantity).step_by(steps).collect();
+        if quantities.is_empty() {
+            return None;
+        }
+        let mut current_index = quantities.len() - 1;
 
-        while tries < max_tries {
+        // Don't check the last index (0) because it has the quantity 0.0
+        while current_index > 0 {
+            let quantity = match quantities.get(current_index) {
+                Some(qty) => *qty as f32,
+                _ => 0.0,
+            };
             let sell_price = market.get_sell_price(good.get_kind(), quantity);
             if let Ok(sell_price) = sell_price {
+                if sell_price.is_subnormal() {
+                    current_index -= 1;
+                    continue;
+                }
+
                 let avg = sell_price / quantity;
                 // try find an avg. sell price that is higher than our avg. buy price to make profit
                 if avg > average_buy_price {
@@ -437,10 +457,8 @@ impl AverageSellerStrategy {
                 );
             }
 
-            // no good price for current quantity has been found, so lower the quantity to try with
-            let s = quantity / 2.0;
-            quantity -= s; // todo check for a more fine grained solution
-            tries += 1;
+            // divide quantity by half
+            current_index -= 1;
         }
 
         None
@@ -648,6 +666,17 @@ impl AverageSellerStrategy {
 
 /// Helper methods
 impl AverageSellerStrategy {
+    /// This method returns an adequate step size to decrease a [`Good`] quantity.
+    fn get_quantity_steps(&self, quantity: i32) -> usize {
+        if quantity > 1_000_000 {
+            1000
+        } else if quantity > 100_000 {
+            100
+        } else {
+            10
+        }
+    }
+
     /// Builds a default buy history that contains all tradable goods.
     fn init_default_buy_history() -> BuyHistory {
         // don't care about EUR
