@@ -1,3 +1,11 @@
+//! This is the implementation of a trader.
+//! A trader simply executes the strategy with which it is getting initialized.
+//! The idea is, that a trader owns all goods and gives a strategy a mutable reference to them.
+//! Then, the trader executes the strategy for *x* days, every *y* minutes of the day. After every
+//! day, the trader pushes a transformed copy of the goods to the history.
+//! Another goal of this implementation is to give a strategy every possible freedom.
+//!
+//! Furthermore, the trader is able export its history in JSON format.
 use crate::consts::TRADER_NAME_AVERAGE_SELLER;
 use crate::strategies::average_seller_strategy::AverageSellerStrategy;
 use crate::strategies::strategy::Strategy;
@@ -124,7 +132,7 @@ impl Trader {
         let goods = Self::create_goods(start_capital);
         let history = Vec::from([Self::transform_good_to_history_day(0, &goods)]);
 
-        // Make all market subscribe
+        // Make all markets subscribe
         strategy.subscribe_all_markets();
 
         Self {
@@ -235,7 +243,6 @@ mod tests {
         let smse = Smse::new_random();
         let tase = TASE::new_random();
         let zse = ZSE::new_random();
-        //subscribe_each_other!(&sgx, &smse, &tase, &zse); // todo fix this
         (sgx, smse, tase, zse)
     }
 

@@ -371,8 +371,6 @@ impl AverageSellerStrategy {
                 buy_tokens.remove(index);
             }
         }
-
-        // todo: Clear bought tokens ??
     }
 }
 
@@ -394,7 +392,7 @@ impl AverageSellerStrategy {
 
         // By default, start with max quantity available
         let mut quantity = good.get_qty();
-        let max_tries = 40; //(quantity / 2.0) as u32; // todo: There has to be a better solution
+        let max_tries = (quantity / 2.0) as u32; // todo: There has to be a better solution
         let mut tries: u32 = 0;
 
         while tries < max_tries {
@@ -546,7 +544,7 @@ impl AverageSellerStrategy {
                 .iter()
                 .find(|m| *m.as_ref().borrow().get_name() == offer.market_name)
                 .map(Rc::clone)
-                .unwrap(); // todo Update the find_market method
+                .unwrap();
             let market = market.as_ref().borrow_mut();
             self.lock_offer(market, offer.clone(), false);
         }
@@ -561,8 +559,6 @@ impl AverageSellerStrategy {
         let best_offers = self.filter_best_offers(&offers);
         // 3. Lock best offers
         self.lock_offers(&best_offers);
-        // 4. Remove all offers we can't sell anymore and repeat
-        // todo: Is this necessary?
     }
 
     /// This method tries to sell all locked goods, where a token is found in `sell_tokens`.
@@ -612,7 +608,6 @@ impl AverageSellerStrategy {
         }
     }
 
-    // todo this redundant
     /// This method clears all token from `sell_tokens` that are contained in `sold_tokens`.
     fn clear_sold_tokens(&self) {
         let mut sell_tokens = self.sell_tokens.borrow_mut();
@@ -735,12 +730,18 @@ impl Strategy for AverageSellerStrategy {
     }
 
     fn apply(&self, goods: &mut Vec<Good>) {
-        self.lock_bids(goods); // 1. Lock buy the cheapest good we can find
-        self.buy_locked_goods(goods); // 2. Buy all locked goods
-        self.clear_bought_tokens(); // 3. Clear buy tokens
-        self.lock_goods_for_sell(goods); // 4. Lock sell all goods for a higher price
-        self.sell_locked_goods(goods); // 5. Sell our goods
-        self.clear_sold_tokens(); // 6. Clear sell tokens
+        // 1. Lock buy the cheapest good we can find
+        self.lock_bids(goods);
+        // 2. Buy all locked goods
+        self.buy_locked_goods(goods);
+        // 3. Clear buy tokens
+        self.clear_bought_tokens();
+        // 4. Lock sell all goods for a higher price
+        self.lock_goods_for_sell(goods);
+        // 5. Lock sell all goods for a higher price
+        self.sell_locked_goods(goods);
+        // 6. Clear sell tokens
+        self.clear_sold_tokens();
     }
 }
 
