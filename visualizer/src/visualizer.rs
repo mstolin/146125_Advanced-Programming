@@ -1,8 +1,8 @@
 use std::error::Error;
 use druid::{AppLauncher, Widget, WindowDesc};
 use plotters::prelude::*;
-use plotters::prelude::full_palette::{CYAN_900, GREEN_300, ORANGE_200, PURPLE_50};
-use plotters::style::full_palette::{BLUE_100, BLUE_50, BLUE_500, INDIGO_100, INDIGO_400, LIGHTBLUE_50, LIGHTBLUE_500, PURPLE_600, RED_500};
+use plotters::prelude::full_palette::{CYAN_900};
+use plotters::style::full_palette::{INDIGO_100, INDIGO_400, LIGHTBLUE_600, PURPLE_600, RED_500};
 use plotters_druid::Plot;
 
 use super::strategy_reader;
@@ -77,7 +77,7 @@ fn chart_builder() -> impl Widget<()>{
 
         let observed = &trades[selected];
         //I need this to draw inside the area of the chart
-        let mut chart_context = chart.build_cartesian_2d(0.0..(observed.executed_ops), 0.0..(observed.max_achieved *1.25)).unwrap();
+        let mut chart_context = chart.build_cartesian_2d(0.0..(observed.executed_ops+0.5), 0.0..(observed.max_achieved *1.25)).unwrap();
         //Background grid
         chart_context.configure_mesh().draw().unwrap();
 
@@ -131,7 +131,7 @@ fn chart_builder() -> impl Widget<()>{
             observed_yen.clone(),
             0.0,
             INDIGO_100.mix(0.33),
-        ).border_style(LIGHTBLUE_500)).unwrap();
+        ).border_style(LIGHTBLUE_600)).unwrap();
 
         chart_context.draw_series(AreaSeries::new(
             observed_yuan.clone(),
@@ -180,7 +180,7 @@ fn chart_builder() -> impl Widget<()>{
             &|c, s, st| {
                 EmptyElement::at(c)    // Composed element on-the-fly
                     + Circle::new((0,0),s,st.filled()) // New pixel coordinate is established in c, with a filled circle on the point
-                    + Text::new(format!("€ {:?}", c.1), (-10,-5), ("sans-serif", 14).into_font()) //Every point will have its value labelled
+                    + Text::new(format!("€ {:.2}", c.1), (-2,-30), ("sans-serif", 14).into_font()) //Every point will have its total value labelled
             },
         )).unwrap();
 
