@@ -6,11 +6,11 @@ use std::io::Write;
 
 #[derive(Debug,Deserialize,Serialize)]
 pub(crate) struct Balance{
-    day:f64,
-    eur:f64,
-    usd:f64,
-    yen:f64,
-    yuan:f64,
+    pub day:f64,
+    pub eur:f64,
+    pub usd:f64,
+    pub yen:f64,
+    pub yuan:f64,
 }
 impl Balance{
     pub(crate) fn get_day(&self) -> f64{
@@ -37,13 +37,19 @@ impl Balance{
 ///
 pub fn save(activities : &[(i32,f64,f64,f64,f64)],filename : &str){
     let balances: Vec<Balance>= activities.iter()
-        .map(|op| Balance{day : op.0 as f64,eur : op.1, usd: op.2, yen : op.3, yuan : op.4})
+        .map(|op| Balance{
+            day : op.0 as f64,
+            eur : op.1,
+            usd: op.2,
+            yen : op.3,
+            yuan : op.4
+        })
         .collect();
-    println!("balance was created as vec<balance>");
+
     let json_ops = serde_json::to_string(&balances).unwrap();
     println!("json was created");
 
-    let mut file = File::create(format!("src/trades/{filename}.json")).expect("Could not save");
+    let mut file = File::create(format!("visualizer/src/trades/{filename}.json")).expect("Could not save");
     file.write_all(json_ops.as_bytes()).unwrap();
 }
 
@@ -52,14 +58,14 @@ pub fn save(activities : &[(i32,f64,f64,f64,f64)],filename : &str){
 /// * `path` - The location of the strategy's log
 pub(crate) fn read(filename :&str) -> Result<Vec<Balance>,serde_json::Error>{
     //test only works with src/trades while the program works with visualizer/src/trades ?? let's check
-    let path = format!("src/trades/{filename}");
+    let path = format!("visualizer/src/trades/{filename}");
     let file = File::open(path).expect("File not found in the folder src/trades");
     serde_json::from_reader(file)
 }
 
 
 pub(crate) fn find_all_available() -> Vec<String>{
-    let directory = "src/trades";
+    let directory = "C:/Users/Farid/CLionProject/trade-agent/visualizer/src/trades";
     let mut strategies = vec![];
     let saved_files = fs::read_dir(directory).expect("Nothing was found");
     for file in saved_files{
