@@ -1,8 +1,8 @@
 use std::error::Error;
 use druid::{AppLauncher, Widget, WindowDesc};
 use plotters::prelude::*;
-use plotters::prelude::full_palette::{CYAN_900, ORANGE_200, PURPLE_50};
-use plotters::style::full_palette::{BLUE_100, BLUE_50, BLUE_500, INDIGO_400, LIGHTBLUE_50, LIGHTBLUE_500, PURPLE_600, RED_500};
+use plotters::prelude::full_palette::{CYAN_900, GREEN_300, ORANGE_200, PURPLE_50};
+use plotters::style::full_palette::{BLUE_100, BLUE_50, BLUE_500, INDIGO_100, INDIGO_400, LIGHTBLUE_50, LIGHTBLUE_500, PURPLE_600, RED_500};
 use plotters_druid::Plot;
 
 use super::strategy_reader;
@@ -81,7 +81,7 @@ fn chart_builder() -> impl Widget<()>{
         //Background grid
         chart_context.configure_mesh().draw().unwrap();
 
-        //base of the plot
+        //base of the plot (eur)
         let observed_eur = observed
             .transaction_summary
             .iter()
@@ -120,23 +120,23 @@ fn chart_builder() -> impl Widget<()>{
         chart_context.draw_series(AreaSeries::new(
             observed_eur.clone(),
             0.0,
-            CYAN_900.mix(0.33),
+            INDIGO_100.mix(0.33),
         ).border_style(INDIGO_400)).unwrap();
         chart_context.draw_series(AreaSeries::new(
             observed_usd.clone(),
             0.0,
-            ORANGE_200.mix(0.33),
+            INDIGO_100.mix(0.33),
         ).border_style(RED_500)).unwrap();
         chart_context.draw_series(AreaSeries::new(
             observed_yen.clone(),
             0.0,
-            BLUE_50.mix(0.33),
+            INDIGO_100.mix(0.33),
         ).border_style(LIGHTBLUE_500)).unwrap();
 
         chart_context.draw_series(AreaSeries::new(
             observed_yuan.clone(),
             0.0,
-            PURPLE_50.mix(0.33),
+            INDIGO_100.mix(0.33),
         ).border_style(PURPLE_600)).unwrap();
 
         //to have a labelled point on every value update on the plot
@@ -147,9 +147,43 @@ fn chart_builder() -> impl Widget<()>{
             &|c, s, st| {
                 EmptyElement::at(c)    // Composed element on-the-fly
                     + Circle::new((0,0),s,st.filled()) // New pixel coordinate is established in c, with a filled circle on the point
-                    + Text::new(format!("€ {:?}", c.1), (-10, 15), ("sans-serif", 14).into_font()) //Every point will have its value labelled
+
             },
         )).unwrap();
+
+        chart_context.draw_series(PointSeries::of_element(
+            observed_usd.clone(),
+            3,
+            &CYAN_900,
+            &|c, s, st| {
+                EmptyElement::at(c)    // Composed element on-the-fly
+                    + Circle::new((0,0),s,st.filled()) // New pixel coordinate is established in c, with a filled circle on the point
+
+            },
+        )).unwrap();
+
+        chart_context.draw_series(PointSeries::of_element(
+            observed_yen.clone(),
+            3,
+            &CYAN_900,
+            &|c, s, st| {
+                EmptyElement::at(c)    // Composed element on-the-fly
+                    + Circle::new((0,0),s,st.filled()) // New pixel coordinate is established in c, with a filled circle on the point
+
+            },
+        )).unwrap();
+
+        chart_context.draw_series(PointSeries::of_element(
+            observed_yuan.clone(),
+            3,
+            &CYAN_900,
+            &|c, s, st| {
+                EmptyElement::at(c)    // Composed element on-the-fly
+                    + Circle::new((0,0),s,st.filled()) // New pixel coordinate is established in c, with a filled circle on the point
+                    + Text::new(format!("€ {:?}", c.1), (-10,-5), ("sans-serif", 14).into_font()) //Every point will have its value labelled
+            },
+        )).unwrap();
+
 
     })
 
