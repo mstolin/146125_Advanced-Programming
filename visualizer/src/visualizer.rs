@@ -17,7 +17,7 @@ impl Strategy {
         let mut transactions = strategy_reader::read(filename)
             .unwrap()
             .into_iter()
-            .map(|x|(x.get_id(),x.get_possession()))
+            .map(|x|(x.get_day(),x.get_eur()+x.get_usd()+x.get_yen()+x.get_yuan()))
             .collect::<Vec<(f64,f64)>>();
         //By sorting we guarantee a linear shape
         transactions.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());

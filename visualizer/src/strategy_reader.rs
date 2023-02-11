@@ -6,15 +6,27 @@ use std::io::Write;
 
 #[derive(Debug,Deserialize,Serialize)]
 pub(crate) struct Balance{
-    id :f64,
-    possession : f64
+    day:f64,
+    eur:f64,
+    usd:f64,
+    yen:f64,
+    yuan:f64,
 }
 impl Balance{
-    pub(crate) fn get_id(&self) -> f64{
-        self.id
+    pub(crate) fn get_day(&self) -> f64{
+        self.day
     }
-    pub(crate) fn get_possession(&self) -> f64{
-        self.possession
+    pub(crate) fn get_eur(&self) -> f64{
+        self.eur
+    }
+    pub(crate) fn get_usd(&self) -> f64{
+        self.usd
+    }
+    pub(crate) fn get_yen(&self) -> f64{
+        self.yen
+    }
+    pub(crate) fn get_yuan(&self) -> f64{
+        self.yuan
     }
 }
 
@@ -23,15 +35,15 @@ impl Balance{
 /// Serializes the activities in a location, with the desired name;
 /// to be able to work for the visualizer it needs a log (vector) of activities in the form of a vector as indicated
 ///
-pub fn save(activities : &[(i32,f64)],filename : &str){
+pub fn save(activities : &[(i32,f64,f64,f64,f64)],filename : &str){
     let balances: Vec<Balance>= activities.iter()
-        .map(|op| Balance{id : op.0 as f64,possession : op.1})
+        .map(|op| Balance{day : op.0 as f64,eur : op.1, usd: op.2, yen : op.3, yuan : op.4})
         .collect();
-
+    println!("balance was created as vec<balance>");
     let json_ops = serde_json::to_string(&balances).unwrap();
+    println!("json was created");
 
-    //need to change filepath after merge to main
-    let mut file = File::create(format!("visualizer/src/trades/{filename}.json")).expect("Could not save");
+    let mut file = File::create(format!("src/trades/{filename}.json")).expect("Could not save");
     file.write_all(json_ops.as_bytes()).unwrap();
 }
 
@@ -39,14 +51,15 @@ pub fn save(activities : &[(i32,f64)],filename : &str){
 /// # File reader
 /// * `path` - The location of the strategy's log
 pub(crate) fn read(filename :&str) -> Result<Vec<Balance>,serde_json::Error>{
-    let path = format!("visualizer/src/trades/{filename}");
+    //test only works with src/trades while the program works with visualizer/src/trades ?? let's check
+    let path = format!("src/trades/{filename}");
     let file = File::open(path).expect("File not found in the folder src/trades");
     serde_json::from_reader(file)
 }
 
 
 pub(crate) fn find_all_available() -> Vec<String>{
-    let directory = "visualizer/src/trades";
+    let directory = "src/trades";
     let mut strategies = vec![];
     let saved_files = fs::read_dir(directory).expect("Nothing was found");
     for file in saved_files{
