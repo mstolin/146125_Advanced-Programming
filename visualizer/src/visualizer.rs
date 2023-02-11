@@ -189,7 +189,7 @@ fn chart_builder() -> impl Widget<()>{
         })).width(800.0).height(700.0));
 
     let trades = load_strategies(); //recreated because of move from the previous plot
-    let selected = 0;
+    let selected = 1;
     row.add_spacer(10.0);
     row.add_child(SizedBox::new(Plot::new(move |_size, _data, root| {
 
