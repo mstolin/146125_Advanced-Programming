@@ -52,7 +52,7 @@ fn load_strategies() -> Vec<Strategy>{
 pub fn render_plot()-> Result<(),Box<dyn Error>>{
     let main_window = WindowDesc::new(chart_builder)
         .title("Strategy result")
-        .window_size((1280.0, 900.0))
+        .window_size((1600.0, 900.0))
         .resizable(true);
 
     AppLauncher::with_window(main_window)
@@ -186,11 +186,11 @@ fn chart_builder() -> impl Widget<()>{
             )).unwrap();
 
 
-        })).width(900.0).height(700.0));
+        })).width(800.0).height(700.0));
 
-    let trades = load_strategies();
+    let trades = load_strategies(); //recreated because of move from the previous plot
     let selected = 0;
-
+    row.add_spacer(10.0);
     row.add_child(SizedBox::new(Plot::new(move |_size, _data, root| {
 
         root.fill(&WHITE).unwrap();
@@ -312,7 +312,7 @@ fn chart_builder() -> impl Widget<()>{
         )).unwrap();
 
 
-    })).width(900.0).height(700.0));
+    })).width(800.0).height(700.0));
 
     return row;
 
