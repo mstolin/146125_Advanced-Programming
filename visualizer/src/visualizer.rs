@@ -88,7 +88,7 @@ fn chart_builder() -> impl Widget<()>{
             .zip(observed.balance.iter())
             .map(|((day,_),(eur,_,_,_)),| (*day,*eur))
             .collect::<Vec<(f64,f64)>>();
-        //on top of eur
+        //usd on top of eur
         let observed_usd = observed
             .transaction_summary
             .iter()
@@ -97,7 +97,7 @@ fn chart_builder() -> impl Widget<()>{
             .zip(observed_eur.iter())
             .map(|((day,usd),(_,eur)),| (*day,*eur+*usd))
             .collect::<Vec<(f64,f64)>>();
-        //on top of usd
+        //yen on top of usd
         let observed_yen = observed
             .transaction_summary
             .iter()
@@ -106,7 +106,7 @@ fn chart_builder() -> impl Widget<()>{
             .zip(observed_usd.iter())
             .map(|((day,yen),(_,usd)),| (*day,*usd+*yen))
             .collect::<Vec<(f64,f64)>>();
-        //on top of yen
+        //yuan on top of yen
         let observed_yuan = observed
             .transaction_summary
             .iter()
@@ -142,7 +142,7 @@ fn chart_builder() -> impl Widget<()>{
         //to have a labelled point on every value update on the plot
         chart_context.draw_series(PointSeries::of_element(
             observed_eur.clone(),
-            5,
+            3,
             &CYAN_900,
             &|c, s, st| {
                 EmptyElement::at(c)    // Composed element on-the-fly
