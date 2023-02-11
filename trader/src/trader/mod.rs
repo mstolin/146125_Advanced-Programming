@@ -1,4 +1,4 @@
-use crate::consts::TRADER_NAME_MOST_SIMPLE;
+use crate::consts::{TRADER_NAME_MOST_SIMPLE, TRADER_NAME_STINGY};
 use crate::strategies::most_simple_strategy::MostSimpleStrategy;
 use crate::strategies::strategy::Strategy;
 use crate::MarketRef;
@@ -8,10 +8,12 @@ use std::cell::RefCell;
 
 use unitn_market_2022::good::good::Good;
 use unitn_market_2022::good::good_kind::GoodKind;
+use crate::strategies::stingy_strategy::StingyStrategy;
 
 #[derive(Clone, Debug, Eq, Ord, PartialOrd, PartialEq)]
 pub enum StrategyIdentifier {
     MostSimple,
+    Stingy,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -74,7 +76,10 @@ impl Trader {
         match id {
             StrategyIdentifier::MostSimple => {
                 Box::new(MostSimpleStrategy::new(markets, trader_name))
-            }
+            },
+            StrategyIdentifier::Stingy => {
+                Box::new(StingyStrategy::new(markets, trader_name))
+            },
         }
     }
 
@@ -82,6 +87,7 @@ impl Trader {
     fn get_name_for_strategy(id: StrategyIdentifier) -> &'static str {
         match id {
             StrategyIdentifier::MostSimple => TRADER_NAME_MOST_SIMPLE,
+            StrategyIdentifier::Stingy => TRADER_NAME_STINGY,
         }
     }
 
@@ -216,7 +222,7 @@ impl Trader {
 
 #[cfg(test)]
 mod tests {
-    use crate::consts::TRADER_NAME_MOST_SIMPLE;
+    use crate::consts::{TRADER_NAME_MOST_SIMPLE, TRADER_NAME_STINGY};
     use crate::trader::{StrategyIdentifier, Trader};
     use crate::MarketRef;
     use smse::Smse;
@@ -387,7 +393,7 @@ mod tests {
 
     #[test]
     fn test_get_name_for_strategy() {
-        let expected = HashMap::from([(TRADER_NAME_MOST_SIMPLE, StrategyIdentifier::MostSimple)]);
+        let expected = HashMap::from([(TRADER_NAME_MOST_SIMPLE, StrategyIdentifier::MostSimple), (TRADER_NAME_STINGY, StrategyIdentifier::Stingy)]);
 
         for (expected_name, id) in expected {
             let name = Trader::get_name_for_strategy(id.clone());
