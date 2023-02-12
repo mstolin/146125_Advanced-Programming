@@ -3,7 +3,7 @@ use druid::{AppLauncher, Widget, WindowDesc};
 use druid::widget::{Flex, Label, SizedBox};
 use plotters::prelude::*;
 use plotters::prelude::full_palette::{CYAN_900};
-use plotters::style::full_palette::{GREEN_500, GREEN_600, INDIGO_100, INDIGO_400, LIGHTBLUE_600, PURPLE_600, RED_500};
+use plotters::style::full_palette::{GREEN_600, INDIGO_100, LIGHTBLUE_600, PURPLE_600, RED_500};
 use plotters_druid::Plot;
 
 use super::strategy_reader;
@@ -188,7 +188,7 @@ fn chart_builder() -> impl Widget<()>{
             )).unwrap();
 
 
-        })).width(800.0).height(700.0));
+        })).width(600.0).height(500.0));
 
     let trades = load_strategies(); //recreated because of move from the previous plot
     let selected = 1;
@@ -314,7 +314,7 @@ fn chart_builder() -> impl Widget<()>{
         )).unwrap();
 
 
-    })).width(800.0).height(700.0));
+    })).width(600.0).height(500.0));
     layout.add_child(row);
     layout.add_child(info_panel());
     return layout;
