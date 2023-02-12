@@ -16,7 +16,7 @@ mod reader_tests {
 
         save(&ops, "save_test_2");
         println!("The file was saved successfully");
-        let expected_content = read("save_test.json");
+        let expected_content = read("save_test_2.json");
         println!("The file contains :\n{:?}", expected_content.as_ref().unwrap());
         assert_eq!(expected_content.is_ok(), true);
     }

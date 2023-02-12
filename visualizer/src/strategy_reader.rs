@@ -36,7 +36,7 @@ impl Balance{
 /// to be able to work for the visualizer it needs a log (vector) of activities in the form of a vector as indicated
 ///
 pub fn save(activities : &Vec<(i32,f64,f64,f64,f64)>,filename : &str){
-    let balances: Vec<Balance>= activities.iter()
+    let balances = activities.into_iter()
         .map(|op| Balance{
             day : op.0 as f64,
             eur : op.1,
@@ -44,12 +44,12 @@ pub fn save(activities : &Vec<(i32,f64,f64,f64,f64)>,filename : &str){
             yen : op.3,
             yuan : op.4
         })
-        .collect();
+        .collect::<Vec<Balance>>();
 
     let json_ops = serde_json::to_string(&balances).unwrap();
     println!("attempting to create json file");
     //path is wrong? Test can read but now write
-    let mut file = File::create(format!("visualizer/src/trades/{filename}.json")).expect("Could not save");
+    let mut file = File::create(format!("src/trades/{}.json",filename)).expect("Could not save");
     println!("json was created");
     file.write_all(json_ops.as_bytes()).unwrap();
 }
@@ -58,7 +58,7 @@ pub fn save(activities : &Vec<(i32,f64,f64,f64,f64)>,filename : &str){
 /// # File reader
 /// * `path` - The location of the strategy's log
 pub(crate) fn read(filename :&str) -> Result<Vec<Balance>,serde_json::Error>{
-    let path = format!("visualizer/src/trades/{filename}");
+    let path = format!("visualizer/src/trades/{}",filename);
     let file = File::open(path).expect("File not found in the folder src/trades");
     serde_json::from_reader(file)
 }
