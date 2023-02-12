@@ -435,4 +435,35 @@ mod tests {
             days + 1
         );
     }
+
+    #[test]
+    fn test_apply_stingy_strategy_for_one_week() {
+        let days = 7;
+        let (sgx, smse, tase, _zse) = init_random_markets();
+        let markets = vec![
+            Rc::clone(&sgx),
+            Rc::clone(&smse),
+            Rc::clone(&tase),
+            //Rc::clone(&zse), // Total "out-of-the-world" offers
+        ];
+
+        let trader = Trader::from(StrategyIdentifier::Stingy, 1_000_000.0, markets);
+
+        assert_eq!(0, trader.get_days(), "Trader should not have started now");
+        trader.apply_strategy(7, 60);
+        assert_eq!(
+            days,
+            trader.get_days(),
+            "Trader must have been running for {} days",
+            days
+        );
+
+        let history = trader.get_history();
+        assert_eq!(
+            days + 1,
+            history.len() as u32,
+            "The length of the history is supposed to be one more than the days running ({})",
+            days + 1
+        );
+    }
 }
