@@ -65,7 +65,7 @@ pub(crate) fn read(filename :&str) -> Result<Vec<Balance>,serde_json::Error>{
 
 
 pub(crate) fn find_all_available() -> Vec<String>{
-    let directory = "C:/Users/Farid/CLionProject/trade-agent/visualizer/src/trades";
+    let directory = "visualizer/src/trades";
     let mut strategies = vec![];
     let saved_files = fs::read_dir(directory).expect("Nothing was found");
     for file in saved_files{
