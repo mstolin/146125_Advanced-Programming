@@ -1,5 +1,6 @@
 use std::error::Error;
 use druid::{AppLauncher, Widget, WindowDesc};
+use druid::scroll_component::ScrollComponent;
 use druid::widget::{Flex, Label, Scroll, SizedBox};
 use plotters::prelude::*;
 use plotters::prelude::full_palette::{CYAN_900};
@@ -330,7 +331,10 @@ fn layout_builder() -> impl Widget<()>{
     layout.add_child(row);
     layout.add_child(info_panel());
     layout.add_child(info_execution(&tldr1,&tldr2));
-    return layout;
+
+    let scroll = Scroll::new(layout);
+    return scroll;
+
 
 }
 
