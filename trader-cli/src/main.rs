@@ -87,6 +87,7 @@ fn parse_markets(markets: &[String]) -> Vec<MarketRef> {
 fn map_strategy_to_id(strategy: &str) -> Option<StrategyIdentifier> {
     match strategy {
         "mostsimple" => Some(StrategyIdentifier::MostSimple),
+        "stingy" => Some(StrategyIdentifier::Stingy),
         _ => None,
     }
 }
