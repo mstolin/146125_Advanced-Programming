@@ -5,9 +5,10 @@ agent on certain markets.
 
 ## Available Strategies
 
-| Identifier                          | File                                                                    | Author        | Description                                            |
-|-------------------------------------|-------------------------------------------------------------------------|---------------|--------------------------------------------------------|
-| `StrategyIdentifier::AverageSeller` | [average_seller_strategy.rs](src/strategies/average_seller_strategy.rs) | Marcel Stolin | [AverageSellerStrategy.md](./AverageSellerStrategy.md) |
+| Identifier                          | File                                                                    | Author            | Description                                            |
+|-------------------------------------|-------------------------------------------------------------------------|-------------------|--------------------------------------------------------|
+| `StrategyIdentifier::AverageSeller` | [average_seller_strategy.rs](src/strategies/average_seller_strategy.rs) | Marcel Stolin     | [AverageSellerStrategy.md](./AverageSellerStrategy.md) |
+| `StrategyIdentifier::Stingy`        | [stingy_strategy.rs](src/strategies/stingy_strategy.rs)                 | Cassol Sebastiano | [StingyStrategy.md](./StingyStrategy.md)               |
 
 ## Usage
 
