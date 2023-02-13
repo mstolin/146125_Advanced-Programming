@@ -627,7 +627,7 @@ impl Strategy for StingyStrategy {
 #[cfg(test)]
 mod tests {
     use crate::consts::TRADER_NAME_STINGY;
-    use crate::strategies::stingy_strategy::{Deal, StingyStrategy};
+    use crate::strategies::stingy_strategy::{Deal, ExchangeRate, StingyStrategy};
     use crate::strategies::strategy::Strategy;
     use crate::MarketRef;
     use smse::Smse;
@@ -983,5 +983,37 @@ mod tests {
         // test update_ex_rate_sell with updated ex_rate_sell_history
         let ex_rate = strategy.get_avg_sell_ex_rate(GoodKind::USD);
         assert!(ex_rate > 0.0, "The average exchange rate (sell) for USG should be greater than 0.0");
+    }
+
+    #[test]
+    fn add_ex_rate_buy_to_history() {
+        let trader_name = TRADER_NAME_STINGY;
+
+        let exchange_rate = ExchangeRate::new(0.9, GoodKind::USD);
+        let strategy = StingyStrategy::new(vec![], trader_name);
+
+        // test add_ex_rate_buy_to_history with an empty vec
+        assert!(strategy.ex_rate_buy_history.borrow().is_empty(), "Ex rate buy history vec should be empty");
+
+        strategy.add_ex_rate_buy_to_history(exchange_rate);
+
+        // test add_ex_rate_buy_to_history with an updated vec
+        assert!(!strategy.ex_rate_buy_history.borrow().is_empty(), "Ex rate buy history vec should not be empty");
+    }
+
+    #[test]
+    fn add_ex_rate_sell_to_history() {
+        let trader_name = TRADER_NAME_STINGY;
+
+        let exchange_rate = ExchangeRate::new(0.9, GoodKind::USD);
+        let strategy = StingyStrategy::new(vec![], trader_name);
+
+        // test add_ex_rate_sell_to_history with an empty vec
+        assert!(strategy.ex_rate_sell_history.borrow().is_empty(), "Ex rate sell history vec should be empty");
+
+        strategy.add_ex_rate_sell_to_history(exchange_rate);
+
+        // test add_ex_rate_sell_to_history with an updated vec
+        assert!(!strategy.ex_rate_sell_history.borrow().is_empty(), "Ex rate sell history vec should not be empty");
     }
 }
