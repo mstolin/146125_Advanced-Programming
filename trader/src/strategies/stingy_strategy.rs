@@ -3,10 +3,14 @@ use log::{info, warn};
 use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::rc::Rc;
-use crate::strategies::strategy::Strategy;
 use crate::MarketRef;
+use crate::strategies::strategy::Strategy;
 use unitn_market_2022::good::good::Good;
 use unitn_market_2022::good::good_kind::GoodKind;
+
+/// This const define the percentage that the trader is willing to buy or sell.
+/// In order to be coherent with the strategy, it has not to be greater than 0.05.
+pub const PERCENTAGE: f32 = 0.01;
 
 /// An `ExchangeRate` is struct that holds the exchange rate of a certain market in a certain moment, for a certain good
 /// It will be added to a `VecDeque<ExchangeRate>` to keep trace of the markets exchange rate history
@@ -19,6 +23,7 @@ struct ExchangeRate {
 }
 
 impl ExchangeRate {
+    /// Define a new `ExchangeRate` instance
     fn new(ex_rate: f32, good_kind: GoodKind) -> ExchangeRate {
         ExchangeRate {
             ex_rate,
@@ -27,9 +32,9 @@ impl ExchangeRate {
     }
 }
 
-/// A `Deal` is a struct that save information about a specific or a possible deal with a market.
+/// A `Deal` is a struct that save information about a possible deal with a certain market.
 /// It saves the price and the quantity specified while searching for a deal, the kind of the good and the market
-/// that owns or buys the good.
+/// that owns or wants the good.
 #[derive(Clone, Debug)]
 struct Deal {
     /// price of the deal
@@ -38,7 +43,7 @@ struct Deal {
     quantity: f32,
     /// kind of the good
     good_kind: GoodKind,
-    /// name of the market that sold the good
+    /// name of the market that sell or buy the good
     market_name: String,
 }
 
@@ -53,31 +58,36 @@ impl Deal {
         }
     }
 
-    /// Let the trader get the ex_rate of the Deal
+    /// Return the exchange rate of the deal
     fn get_ex_rate(&self) -> f32 { self.price / self.quantity }
 }
 
-
+/// Implementation of the `StingyStrategy`.
 pub struct StingyStrategy {
-    /// name of the trader that is using this strategy
+    /// name of the trader that use this strategy
     trader_name: String,
-    /// all markets used in this strategy
+    /// all the markets involved in this strategy
     markets: Vec<MarketRef>,
-    /// Price history of the exchange rate for buying goods from the markets
+    /// History of the exchange rates for **buying** goods from the markets.
+    /// It can contain the last ten exchange rates for every kind of good.
     /// It is a `VecDeque` in order to push back the new data and pop front the old data.
     ex_rate_buy_history: RefCell<VecDeque<ExchangeRate>>,
-    /// Price history of the exchange rate for selling goods to the markets
+    /// History of the exchange rates for **selling** goods to the markets.
+    /// It can contain the last ten exchange rates for every kind of good.
     /// It is a `VecDeque` in order to push back the new data and pop front the old data.
     ex_rate_sell_history: RefCell<VecDeque<ExchangeRate>>,
-    /// history of all the deal done by the trader for buying goods from the markets
+    /// History of all the deal done by the trader for **buying** goods from the markets.
     deals_buy_history: RefCell<Vec<Deal>>,
-    /// history of all the deal done by the trader for selling goods to the markets
+    /// History of all the deal done by the trader for **selling** goods to the markets
     deals_sell_history: RefCell<Vec<Deal>>,
 }
 
-/// buy functions
+/// Methods for **buy**.
 impl StingyStrategy {
-    /// This function find the possible deals for buying some goods
+    /// Return a `Vec<Deal>` that contains all the possible deals that the trader can do with the markets
+    /// involved in the strategy.
+    /// The idea is: for every market, try to find a deal spending only a little amount of EUR.
+    /// This trader is **stingy**!
     fn find_deals(&self, balance: f32, percentage: f32) -> Vec<Deal>{
 
         if percentage > 1.0 {
@@ -116,24 +126,24 @@ impl StingyStrategy {
                                 market_name: market_name.clone()
                             });
                         }
-                    } // else {
-                    //     warn!("Could not find a possible deal");
-                    // }
+                    }
                 }
             }
         }
         return deals;
     }
 
-    /// Filter the deals contained in the `deals` vec.
-    /// If there are no deal with a good ex_rate, select the deal with the ex rate that is less then the others.
+    /// Return an optional `Deal` that represent the best deal contained in the `Vec<Deal>`.
+    /// A deal, to be considered good, must have an exchange rate **lower** than the average exchange rate for that
+    /// type of good. If there are no deal with a "good" exchange rate, the method will select the deal that has
+    /// the **lower** exchange rate in `Vec<Deal>`.
     fn filter_deals(&self, deals: Vec<Deal>) -> Option<Deal> {
 
         let mut best_deal: Option<Deal> = None;
 
         let filtered_deals = deals
             .iter()
-            .filter(|deal| deal.get_ex_rate() > self.get_avg_buy_ex_rate(deal.good_kind))
+            .filter(|deal| deal.get_ex_rate() <= self.get_avg_buy_ex_rate(deal.good_kind))
             .cloned()
             .collect::<Vec<Deal>>();
 
@@ -162,6 +172,8 @@ impl StingyStrategy {
         best_deal
     }
 
+    /// Return an optional `String` that represent the token needed to **buy** a certain quantity of a good.
+    /// This method try to get a valid token for a specific deal.
     fn lock_deal(&self, deal: &Deal) -> Option<String> {
         let market = self
             .markets
@@ -189,6 +201,10 @@ impl StingyStrategy {
         None
     }
 
+    /// This method try to **buy** the locked good.
+    /// It uses `find_deals()` and `filter_deals()` to get a good deal, then try to lock buy using `lock_deal()`
+    /// and finally buy the good from the market and merge the received amount of good.
+    /// If the buy operation goes well, this method adds the deal to the buy history.
     fn buy_deal(&self, trader_goods: &mut [Good]) {
         let balance = trader_goods
             .iter_mut()
@@ -202,7 +218,7 @@ impl StingyStrategy {
             .unwrap();
 
 
-        let deals= self.find_deals(balance, 0.05);
+        let deals= self.find_deals(balance, PERCENTAGE);
         let deal = self.filter_deals(deals);
         if let Some(deal) = deal {
             let token = self.lock_deal(&deal);
@@ -232,7 +248,6 @@ impl StingyStrategy {
 
                     let _ = trader_good.merge(buy_good.clone());
 
-                    // self.update_ex_rates_buy();
                     self.update_buy_history(deal);
                 } else {
                     warn!("Unable to buy the good: {:?}", buy_good);
@@ -242,9 +257,13 @@ impl StingyStrategy {
     }
 }
 
-/// sell functions
+/// Methods for **sell**.
 impl StingyStrategy {
 
+    /// Return a `Vec<Deal>` that contains all the possible deals that the trader can do with the markets
+    /// involved in the strategy.
+    /// The idea is: for every market, try to find a deal selling only a little amount of a certain good.
+    /// This trader is **stingy**!
     fn find_deal_for_sell(&self, trader_goods: &[Good], percentage: f32) -> Vec<Deal> {
 
         let mut deals: Vec<Deal> = Vec::new();
@@ -292,6 +311,10 @@ impl StingyStrategy {
         deals
     }
 
+    /// Return an optional `Deal` that represent the best deal contained in the `Vec<Deal>`.
+    /// A deal, to be considered good, must have an exchange rate **greater** than the average exchange rate for that
+    /// type of good. If there are no deal with a "good" exchange rate, the method will select the deal that has
+    /// the **higher** exchange rate in `Vec<Deal>`.
     fn filter_deals_for_sell(&self, deals: Vec<Deal>) -> Option<Deal>{
         let mut best_deal: Option<Deal> = None;
 
@@ -328,6 +351,8 @@ impl StingyStrategy {
         best_deal
     }
 
+    /// Return an optional `String` that represent the token needed to **sell** a certain quantity of a good.
+    /// This method try to get a valid token for a specific deal.
     fn lock_deal_for_sell(&self, deal: &Deal) -> Option<String> {
         let market = self
             .markets
@@ -359,9 +384,13 @@ impl StingyStrategy {
         None
     }
 
+    /// This method try to **sell** the locked good.
+    /// It uses `find_deals_for_sell()` and `filter_deals_for_Sell()` to get a good deal, then try to lock sell
+    /// using `lock_deal_for_sell()` and finally **sell** the good from the market and merge the received amount
+    /// of good. If the sell operation goes well, this method adds the deal to the sell history.
     fn sell_deal(&self, trader_goods: &mut [Good]) {
 
-        let deals = self.find_deal_for_sell(trader_goods, 0.05);
+        let deals = self.find_deal_for_sell(trader_goods, PERCENTAGE);
         let deal = self.filter_deals_for_sell(deals);
 
         if let Some(deal) = deal {
@@ -407,13 +436,14 @@ impl StingyStrategy {
     }
 }
 
-/// helper functions
+/// Helper methods
 impl StingyStrategy {
-    /// Get the quantity of the markets "used" by the trader.
+    /// Get the quantity of the markets involved in this strategy.
     fn get_market_qty(&self) -> usize {
         return self.markets.len();
     }
 
+    /// It is a method for debugging purposes.
     fn display_goods(&self, trader_goods: &[Good]) {
         info!("--------- DISPLAY GOODS ---------");
         for good in trader_goods.iter() {
@@ -422,12 +452,12 @@ impl StingyStrategy {
     }
 }
 
-/// helper functions for buying
+/// Helper methods for **buying**.
 impl StingyStrategy {
-    /// Add a new exchange rate item in the [`ex_rate_history`] only if there
-    /// are no more than 10 ex rate for every good kind (total: 30)
-    /// If there are more than 10 ex rate for every good kind, it removes the first 3 items of
-    /// the [`ex_rate_history`] deque vector.
+    /// This methods dda a new exchange rate item, passed as a parameter, in the [`ex_rate_buy_history`]
+    /// only if there are no more than 10 exchange rates for every kind of good (total: 30).
+    /// If there are more than 10 ex rate for every kind of good, it removes the first 3 items of
+    /// the [`ex_rate_buy_history`] deque vector.
     fn add_ex_rate_buy_to_history(&self, e: ExchangeRate) {
         let mut history = self.ex_rate_buy_history.borrow_mut();
         if history.len() >= self.get_market_qty() * 3 * 10 {
@@ -438,7 +468,7 @@ impl StingyStrategy {
         history.push_back(e);
     }
 
-    /// Return a `Vec<ExchangeRate>` that contains the exchange rate of the goods in that moment
+    /// Return a `Vec<ExchangeRate>` that contains the exchange rates of the goods in this moment.
     fn get_ex_rates_buy(&self) -> Vec<ExchangeRate> {
         let mut ex_rates: Vec<ExchangeRate> = Vec::new();
         for market in self.markets.iter() {
@@ -455,8 +485,8 @@ impl StingyStrategy {
         return ex_rates;
     }
 
-    /// Update the [`ex_rate_history`] with the actual exchange rate of the good using the
-    /// `add_ex_rate_to_history` function
+    /// Update the [`ex_rate_buy_history`] with the actual exchange rate of the good.
+    /// It uses `add_ex_rate_buy_to_history()` and `get_ex_rates_buy()`.
     fn update_ex_rates_buy(&self) {
         let ex_rates = self.get_ex_rates_buy();
         for item in ex_rates {
@@ -464,7 +494,7 @@ impl StingyStrategy {
         }
     }
 
-    /// Return as `f32` the average exchange rate for buying a certain good kind during the last 10 operations.
+    /// Return as `f32` the average exchange rate for **buying** a certain good kind during the last 10 operations.
     fn get_avg_buy_ex_rate(&self, good_kind: GoodKind) -> f32 {
         let mut counter = 0;
         let mut total : f32 = 0.0;
@@ -483,15 +513,20 @@ impl StingyStrategy {
         return total / counter as f32;
     }
 
+    /// This methods adds a `deal` to the buy history.
     fn update_buy_history(&self, deal: Deal) {
         let mut deal_buy_history = self.deals_buy_history.borrow_mut();
         deal_buy_history.push(deal);
     }
 }
 
-/// helper functions for selling
+/// Helper methods for **selling**.
 impl StingyStrategy {
 
+    /// This methods dda a new exchange rate item, passed as a parameter, in the [`ex_rate_sell_history`]
+    /// only if there are no more than 10 exchange rates for every kind of good (total: 30).
+    /// If there are more than 10 ex rate for every kind of good, it removes the first 3 items of
+    /// the [`ex_rate_sell_history`] deque vector.
     fn add_ex_rate_sell_to_history(&self, e: ExchangeRate) {
         let mut history = self.ex_rate_sell_history.borrow_mut();
         if history.len() >= self.get_market_qty() * 3 * 10 {
@@ -502,7 +537,7 @@ impl StingyStrategy {
         history.push_back(e);
     }
 
-    /// Return a `Vec<ExchangeRate>` that contains the exchange rate of the goods in that moment
+    /// Return a `Vec<ExchangeRate>` that contains the exchange rates of the goods in this moment.
     fn get_ex_rates_sell(&self) -> Vec<ExchangeRate> {
         let mut ex_rates: Vec<ExchangeRate> = Vec::new();
         for market in self.markets.iter() {
@@ -519,6 +554,8 @@ impl StingyStrategy {
         return ex_rates;
     }
 
+    /// Update the [`ex_rate_sell_history`] with the actual exchange rate of the good.
+    /// It uses `add_ex_rate_sell_to_history()` and `get_ex_rates_sell()`.
     fn update_ex_rates_sell(&self) {
         let ex_rates = self.get_ex_rates_sell();
         for item in ex_rates {
@@ -526,7 +563,7 @@ impl StingyStrategy {
         }
     }
 
-    /// Return as `f32` the average exchange rate for buying a certain good kind during the last 10 operations.
+    /// Return as `f32` the average exchange rate for **selling** a certain good kind during the last 10 operations.
     fn get_avg_sell_ex_rate(&self, good_kind: GoodKind) -> f32 {
         let mut counter = 0;
         let mut total : f32 = 0.0;
@@ -545,6 +582,7 @@ impl StingyStrategy {
         return total / counter as f32;
     }
 
+    /// This methods adds a `deal` to the sell history.
     fn update_sell_history(&self, deal: Deal) {
         let mut deal_sell_history = self.deals_sell_history.borrow_mut();
         deal_sell_history.push(deal);
@@ -552,6 +590,7 @@ impl StingyStrategy {
 }
 
 impl Strategy for StingyStrategy {
+    /// Define a new `Strategy` instance
     fn new(markets: Vec<MarketRef>, trader_name: &str) -> Self {
         Self {
             trader_name: trader_name.to_string(),
@@ -563,10 +602,13 @@ impl Strategy for StingyStrategy {
         }
     }
 
+    /// Return a vector of `MarketRef`.
+    /// This methods return references to the markets involved in the strategy.
     fn get_markets(&self) -> &Vec<MarketRef> {
         self.markets.borrow()
     }
 
+    /// This methods try to sell all the goods owned by the trader (except for `EUR` before closing the strategy.
     fn sell_remaining_goods(&self, goods: &mut Vec<Good>) {
         // let deals = self.find_deal_for_sell(goods, 1.0);
         // for deal in deals.iter() {
@@ -589,6 +631,7 @@ impl Strategy for StingyStrategy {
         // }
     }
 
+    /// This method defines how to apply the strategy.
     fn apply(&self, goods: &mut Vec<Good>) {
         self.display_goods(goods);
         self.buy_deal(goods);
