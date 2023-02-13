@@ -41,13 +41,10 @@ use trader::trader::{StrategyIdentifier, Trader};
 use unitn_market_2022::market::Market;
 use SGX::market::sgx::SGX;
 use TASE::TASE;
-//use visualizer::visualizer::render_plot;
 use ZSE::market::ZSE;
 
 /// Represents a market
 type MarketRef = Rc<RefCell<dyn Market>>;
-
-//const VISUALIZER_INPUT_PATH: &str = "../../visualizer/src/trades";
 
 /// Possible arguments for the executable.
 #[derive(Debug, Parser)]
@@ -76,9 +73,12 @@ pub struct Args {
     /// Otherwise, it will be printed as plain text.
     #[arg(short, long, default_value_t = false)]
     pub as_json: bool,
-    /// Visualize the history using the Visualizer.
+    /// Output path for the history as a JSON file.
+    /// Can either be a file, or a directory.
+    /// If a directory is given, the filename will be
+    /// STRATEGY_NAME-TIMESTAMP.json.
     #[arg(short, long)]
-    pub visualizer_input_path: Option<PathBuf>,
+    pub output: Option<PathBuf>,
 }
 
 /// Generates a [`MarketRef`] instance if the given is valid, otherwise
@@ -126,22 +126,14 @@ fn map_strategy_to_id(strategy: &str) -> Option<StrategyIdentifier> {
 }
 
 /// Writes the history to the visualizer input path.
-fn write_history(file_path: PathBuf, history: String) -> Result<String, io::Error> {
-    println!("OUTPUT PATH IS: {:?}", file_path);
+fn write_history(file_path: &PathBuf, history: &String) -> Result<(), io::Error> {
     match File::create(file_path) {
         Ok(mut file) => match file.write_all(history.as_bytes()) {
-            Ok(_) => Ok("".to_string()),
+            Ok(_) => Ok(()),
             Err(e) => Err(e),
         },
         Err(e) => Err(e),
     }
-}
-
-fn visualize_history() {
-    /*if let Err(e) = render_plot() {
-        println!("Error while visualizing history: {:?}", e);
-    }*/
-    ()
 }
 
 /// Main endpoint for the executable.
@@ -163,18 +155,20 @@ fn main() {
         let trader = Trader::from(strategy_id, args.capital, markets);
         trader.apply_strategy(args.days, args.minute_interval);
 
-        if let Some(input_path) = args.visualizer_input_path {
-            // first we need to save the json, then visualize
-            let filename = format!("{}-{}.json", args.strategy, Local::now().timestamp());
-            let filename = PathBuf::from(filename);
-            let input_path = input_path.join(filename);
+        if let Some(mut output_path) = args.output {
+            if output_path.is_dir() {
+                let filename = format!("{}-{}.json", args.strategy, Local::now().timestamp());
+                let filename = PathBuf::from(filename);
+                output_path = output_path.join(filename);
+            }
+
             let history = trader.get_history_as_json();
-            match write_history(input_path, history) {
-                Ok(path) => {
-                    println!("Successfully wrote history to {path}");
-                    visualize_history();
+            match write_history(&output_path, &history) {
+                Ok(_) => {
+                    let output = output_path.as_os_str().to_str().unwrap_or_default();
+                    println!("Successfully wrote history to {output}");
                 }
-                Err(e) => println!("Error while writing history as JSON: {:?}", e),
+                Err(e) => println!("Error while writing history as JSON: {}", e),
             }
         } else if args.as_json {
             println!("{}", trader.get_history_as_json());
