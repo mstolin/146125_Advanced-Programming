@@ -58,7 +58,7 @@ pub fn save(activities : &Vec<(i32,f64,f64,f64,f64)>,filename : &str){
 /// # File reader
 /// * `path` - The location of the strategy's log
 pub(crate) fn read(filename :&str) -> Result<Vec<Balance>,serde_json::Error>{
-    let path = format!("visualizer/src/trades/{}",filename);
+    let path = format!("visualizer/src/trades/{filename}");
     let file = File::open(path).expect("File not found in the folder src/trades");
     serde_json::from_reader(file)
 }

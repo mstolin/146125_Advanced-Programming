@@ -14,9 +14,9 @@ mod reader_tests {
             (6, 4425.7246, 20091.201, 0.0, 25114.344),
             (7, 14692.314, 20091.201, 0.0, 0.0)];
 
-        save(&ops, "save_test_2");
+        save(&ops, "save_example");
         println!("The file was saved successfully");
-        let expected_content = read("save_test_2.json");
+        let expected_content = read("save_example.json");
         println!("The file contains :\n{:?}", expected_content.as_ref().unwrap());
         assert_eq!(expected_content.is_ok(), true);
     }
