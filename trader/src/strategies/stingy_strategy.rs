@@ -10,7 +10,9 @@ use unitn_market_2022::good::good_kind::GoodKind;
 
 /// This const define the percentage that the trader is willing to buy or sell.
 /// In order to be coherent with the strategy, it has not to be greater than 0.05.
-pub const PERCENTAGE: f32 = 0.01;
+pub const PERCENTAGE_BUY: f32 = 0.01;
+pub const PERCENTAGE_SELL: f32 = 0.01;
+pub const PERCENTAGE_SELL_ALL_GOODS: f32 = 1.0;
 
 /// An `ExchangeRate` is struct that holds the exchange rate of a certain market in a certain moment, for a certain good
 /// It will be added to a `VecDeque<ExchangeRate>` to keep trace of the markets exchange rate history
@@ -205,7 +207,7 @@ impl StingyStrategy {
     /// It uses `find_deals()` and `filter_deals()` to get a good deal, then try to lock buy using `lock_deal()`
     /// and finally buy the good from the market and merge the received amount of good.
     /// If the buy operation goes well, this method adds the deal to the buy history.
-    fn buy_deal(&self, trader_goods: &mut [Good]) {
+    fn buy_deal(&self, trader_goods: &mut [Good], percentage: f32) {
         let balance = trader_goods
             .iter_mut()
             .find(|good|good.get_kind() == GoodKind::EUR)
@@ -218,7 +220,7 @@ impl StingyStrategy {
             .unwrap();
 
 
-        let deals= self.find_deals(balance, PERCENTAGE);
+        let deals= self.find_deals(balance, percentage);
         let deal = self.filter_deals(deals);
         if let Some(deal) = deal {
             let token = self.lock_deal(&deal);
@@ -388,9 +390,9 @@ impl StingyStrategy {
     /// It uses `find_deals_for_sell()` and `filter_deals_for_Sell()` to get a good deal, then try to lock sell
     /// using `lock_deal_for_sell()` and finally **sell** the good from the market and merge the received amount
     /// of good. If the sell operation goes well, this method adds the deal to the sell history.
-    fn sell_deal(&self, trader_goods: &mut [Good]) {
+    fn sell_deal(&self, trader_goods: &mut [Good], percentage: f32) {
 
-        let deals = self.find_deal_for_sell(trader_goods, PERCENTAGE);
+        let deals = self.find_deal_for_sell(trader_goods, percentage);
         let deal = self.filter_deals_for_sell(deals);
 
         if let Some(deal) = deal {
@@ -589,6 +591,19 @@ impl StingyStrategy {
     }
 }
 
+/// Helper methods
+impl StingyStrategy {
+    fn find_deal_by_good(&self, deals: &Vec<Deal>, goodkind: GoodKind) -> Vec<Deal> {
+        let deals_some_good = deals
+            .iter()
+            .filter(|deal| deal.good_kind == goodkind)
+            .cloned()
+            .collect::<Vec<Deal>>();
+
+        deals_some_good
+    }
+}
+
 impl Strategy for StingyStrategy {
     /// Define a new `Strategy` instance
     fn new(markets: Vec<MarketRef>, trader_name: &str) -> Self {
@@ -610,33 +625,18 @@ impl Strategy for StingyStrategy {
 
     /// This methods try to sell all the goods owned by the trader (except for `EUR` before closing the strategy.
     fn sell_remaining_goods(&self, goods: &mut Vec<Good>) {
-        // let deals = self.find_deal_for_sell(goods, 1.0);
-        // for deal in deals.iter() {
-        //     let token = self.lock_deal_for_sell(deal);
-        //     // if let Some(token) = token {
-        //     //     let market = self
-        //     //         .markets
-        //     //         .iter()
-        //     //         .find(|market| market.as_ref().borrow().get_name() == deal.market_name)
-        //     //         .unwrap();
-        //     //
-        //     //     let trader_good = goods
-        //     //         .iter_mut()
-        //     //         .find(|good|good.get_kind() == deal.good_kind)
-        //     //         .unwrap();
-        //     //
-        //     //     let mut market = market.as_ref().borrow_mut();
-        //     //     let sell_good = market.sell(token.clone(), trader_good);
-        //     // }
-        // }
+        for _ in 0..3 {
+            self.sell_deal(goods, PERCENTAGE_SELL_ALL_GOODS);
+        }
+        self.display_goods(goods);
     }
 
     /// This method defines how to apply the strategy.
     fn apply(&self, goods: &mut Vec<Good>) {
         self.display_goods(goods);
-        self.buy_deal(goods);
+        self.buy_deal(goods, PERCENTAGE_BUY);
         self.update_ex_rates_buy();
-        self.sell_deal(goods);
+        self.sell_deal(goods, PERCENTAGE_SELL);
         self.update_ex_rates_sell();
         self.display_goods(goods);
     }
