@@ -102,7 +102,7 @@ impl StingyStrategy {
             for good in goods {
                 if good.good_kind != GoodKind::EUR {
                     let quantity = balance * percentage * good.exchange_rate_buy;
-                    /// TODO: check this
+
                     let buy_price = market
                         .as_ref()
                         .borrow()
@@ -120,18 +120,18 @@ impl StingyStrategy {
                                 buy_price,
                                 market_name.clone()
                             );
-                            deals.push(Deal {
-                                price: buy_price,
+                            deals.push(Deal::new(
+                                buy_price,
                                 quantity,
-                                good_kind: good.good_kind,
-                                market_name: market_name.clone(),
-                            });
+                                good.good_kind,
+                                market_name.clone()
+                            ));
                         }
                     }
                 }
             }
         }
-        return deals;
+        deals
     }
 
     /// Return an optional `Deal` that represent the best deal contained in the `Vec<Deal>`.
@@ -149,11 +149,12 @@ impl StingyStrategy {
 
         let deals_to_iter;
 
-        if filtered_deals.len() > 0 {
+        if filtered_deals.is_empty() {
             deals_to_iter = &filtered_deals;
         } else {
             deals_to_iter = &deals;
-        }
+        };
+
         for deal in deals_to_iter.iter() {
             if let Some(best_deal) = &mut best_deal {
                 if deal.get_ex_rate() < best_deal.get_ex_rate() {
@@ -178,7 +179,7 @@ impl StingyStrategy {
         let market = self
             .markets
             .iter()
-            .find(|m| m.as_ref().borrow().get_name().to_string() == deal.market_name);
+            .find(|m| *m.as_ref().borrow().get_name().to_string() == deal.market_name);
 
         if let Some(market) = market {
             let mut market = market.as_ref().borrow_mut();
@@ -191,7 +192,7 @@ impl StingyStrategy {
             );
 
             if let Ok(token) = token {
-                info!("Lock buy done with token: {}", token.clone());
+                info!("Lock buy done with token: {}", token);
                 return Some(token);
             } else {
                 warn!("Not able to lock buy: {:?}", token);
@@ -225,12 +226,12 @@ impl StingyStrategy {
             let market = self
                 .markets
                 .iter()
-                .find(|market| market.as_ref().borrow().get_name().to_string() == deal.market_name)
+                .find(|market| *market.as_ref().borrow().get_name().to_string() == deal.market_name)
                 .unwrap();
             let mut market = market.as_ref().borrow_mut();
 
             if let Some(token) = token {
-                let buy_good = market.buy(token.clone(), trader_eur);
+                let buy_good = market.buy(token, trader_eur);
 
                 if let Ok(buy_good) = buy_good {
                     info!(
@@ -295,12 +296,12 @@ impl StingyStrategy {
                                     sell_price,
                                     market_name.clone()
                                 );
-                                deals.push(Deal {
-                                    price: sell_price,
+                                deals.push(Deal::new(
+                                    sell_price,
                                     quantity,
-                                    good_kind: good.get_kind(),
-                                    market_name: market_name.clone(),
-                                });
+                                    good.get_kind(),
+                                    market_name.clone()
+                                ));
                             }
                         }
                     }
@@ -325,7 +326,7 @@ impl StingyStrategy {
 
         let deals_to_iter;
 
-        if filtered_deals.len() > 0 {
+        if filtered_deals.is_empty() {
             deals_to_iter = &filtered_deals;
         } else {
             deals_to_iter = &deals;
@@ -399,7 +400,7 @@ impl StingyStrategy {
             let market = self
                 .markets
                 .iter()
-                .find(|market| market.as_ref().borrow().get_name().to_string() == deal.market_name)
+                .find(|market| *market.as_ref().borrow().get_name().to_string() == deal.market_name)
                 .unwrap();
             let mut market = market.as_ref().borrow_mut();
 
@@ -409,7 +410,7 @@ impl StingyStrategy {
                     .find(|good| good.get_kind() == deal.good_kind)
                     .unwrap();
 
-                let sell_good = market.sell(token.clone(), good_to_sell);
+                let sell_good = market.sell(token, good_to_sell);
 
                 if let Ok(sell_good) = sell_good {
                     info!(
@@ -441,7 +442,7 @@ impl StingyStrategy {
 impl StingyStrategy {
     /// Get the quantity of the markets involved in this strategy.
     fn get_market_qty(&self) -> usize {
-        return self.markets.len();
+        self.markets.len()
     }
 
     /// It is a method for debugging purposes.
@@ -480,7 +481,7 @@ impl StingyStrategy {
                 }
             }
         }
-        return ex_rates;
+        ex_rates
     }
 
     /// Update the [`ex_rate_buy_history`] with the actual exchange rate of the good.
@@ -508,7 +509,7 @@ impl StingyStrategy {
             }
         }
 
-        return total / counter as f32;
+        total / counter as f32
     }
 
     /// This methods adds a `deal` to the buy history.
@@ -545,7 +546,7 @@ impl StingyStrategy {
                 }
             }
         }
-        return ex_rates;
+        ex_rates
     }
 
     /// Update the [`ex_rate_sell_history`] with the actual exchange rate of the good.
@@ -573,26 +574,13 @@ impl StingyStrategy {
             }
         }
 
-        return total / counter as f32;
+        total / counter as f32
     }
 
     /// This methods adds a `deal` to the sell history.
     fn update_sell_history(&self, deal: Deal) {
         let mut deal_sell_history = self.deals_sell_history.borrow_mut();
         deal_sell_history.push(deal);
-    }
-}
-
-/// Helper methods
-impl StingyStrategy {
-    fn find_deal_by_good(&self, deals: &Vec<Deal>, goodkind: GoodKind) -> Vec<Deal> {
-        let deals_some_good = deals
-            .iter()
-            .filter(|deal| deal.good_kind == goodkind)
-            .cloned()
-            .collect::<Vec<Deal>>();
-
-        deals_some_good
     }
 }
 
