@@ -668,7 +668,7 @@ mod tests {
         let tase = init_tase(0.0, 10000.0, 10000.0, 0.0);
         let zse = init_zse(0.0, 10.0, 100.0, 0.0);
 
-        let markets = vec![
+        let _markets = vec![
             Rc::clone(&sgx),
             Rc::clone(&smse),
             Rc::clone(&tase),
@@ -695,7 +695,7 @@ mod tests {
         assert!(deals.is_empty(), "The strategy should not find a deal");
 
         // test find deals with more than one market
-        let sgx = init_sgx(0.0, 0.0, 100_000.0, 0.0);
+        let _sgx = init_sgx(0.0, 0.0, 100_000.0, 0.0);
         let smse = init_smse(0.0, 10.0, 0.0, 0.0);
         let tase = init_tase(0.0, 0.0, 10000.0, 10_000.0);
         let zse = init_zse(0.0, 0.0, 100_000.0, 10.0);
@@ -794,7 +794,7 @@ mod tests {
         let good_usd = Good::new(GoodKind::USD, 90.0);
         let good_yuan = Good::new(GoodKind::YUAN, 100.0);
 
-        let deals = strategy.find_deal_for_sell(&vec![good_yen, good_usd, good_yuan], 0.05);
+        let deals = strategy.find_deal_for_sell(&[good_yen, good_usd, good_yuan], 0.05);
         assert!(!deals.is_empty(), "The strategy should find a good deal for sell");
 
         // test find deals for sell with no deal
@@ -814,7 +814,7 @@ mod tests {
         let good_usd = Good::new(GoodKind::USD, 100.0);
         let good_yuan = Good::new(GoodKind::YUAN, 50.0);
 
-        let deals = strategy.find_deal_for_sell(&vec![good_yen, good_usd, good_yuan], 0.05);
+        let deals = strategy.find_deal_for_sell(&[good_yen, good_usd, good_yuan], 0.05);
         assert!(deals.is_empty(), "The strategy should not find a good deal for sell");
     }
 
@@ -835,7 +835,7 @@ mod tests {
         let good_usd = Good::new(GoodKind::USD, 90.0);
         let good_yuan = Good::new(GoodKind::YUAN, 100.0);
 
-        let deals = strategy.find_deal_for_sell(&vec![good_yen, good_usd, good_yuan], 0.05);
+        let deals = strategy.find_deal_for_sell(&[good_yen, good_usd, good_yuan], 0.05);
         let deal = strategy.filter_deals(deals);
         assert!(deal.is_some(), "The strategy should find a good deal to sell");
 
@@ -852,7 +852,7 @@ mod tests {
         let good_usd = Good::new(GoodKind::USD, 100.0);
         let good_yuan = Good::new(GoodKind::YUAN, 50.0);
 
-        let deals = strategy.find_deal_for_sell(&vec![good_yen, good_usd, good_yuan], 0.05);
+        let deals = strategy.find_deal_for_sell(&[good_yen, good_usd, good_yuan], 0.05);
         let deal = strategy.filter_deals(deals);
         assert!(deal.is_none(), "The strategy should not find a good deal to sell");
     }
