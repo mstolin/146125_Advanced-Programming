@@ -27,10 +27,14 @@
 //! $ trader-cli average-seller sgx smse tase -d 7 -m 10 -c 3000000
 //! ```
 
+use chrono::Local;
 use clap::Parser;
 use env_logger::Env;
 use smse::Smse;
 use std::cell::RefCell;
+use std::fs::File;
+use std::io;
+use std::io::prelude::Write;
 use std::rc::Rc;
 use trader::trader::{StrategyIdentifier, Trader};
 use unitn_market_2022::market::Market;
@@ -40,6 +44,8 @@ use ZSE::market::ZSE;
 
 /// Represents a market
 type MarketRef = Rc<RefCell<dyn Market>>;
+
+const VISUALIZER_INPUT_PATH: &str = "../../visualizer/src/trades";
 
 /// Possible arguments for the executable.
 #[derive(Debug, Parser)]
@@ -68,9 +74,9 @@ pub struct Args {
     /// Otherwise, it will be printed as plain text.
     #[arg(short, long, default_value_t = false)]
     pub as_json: bool,
-    /// Print the history after a successful run.
-    #[arg(short, long, default_value_t = true)]
-    pub print_history: bool,
+    /// Visualize the history using the Visualizer.
+    #[arg(short, long, default_value_t = false)]
+    pub visualize: bool,
 }
 
 /// Generates a [`MarketRef`] instance if the given is valid, otherwise
@@ -99,7 +105,7 @@ fn parse_markets(markets: &[String]) -> Vec<MarketRef> {
     // remove duplicates
     markets.dedup();
     for market_name in markets.iter() {
-        if let Some(market) = MarketFactory::gen_market(market_name.as_str()) {
+        if let Some(market) = gen_market(market_name.as_str()) {
             market_refs.push(market);
         } else {
             println!("Market '{market_name}' is not available. Try sgx, smse, tase, or zse.");
@@ -114,6 +120,15 @@ fn map_strategy_to_id(strategy: &str) -> Option<StrategyIdentifier> {
     match strategy {
         "average-seller" => Some(StrategyIdentifier::AverageSeller),
         _ => None,
+    }
+}
+
+/// Writes the history to the visualizer input path.
+fn write_history(filename: String, history: String) -> Result<(), io::Error> {
+    let output_path = format!("{VISUALIZER_INPUT_PATH}/{filename}");
+    match File::create(output_path) {
+        Ok(mut file) => file.write_all(history.as_bytes()),
+        Err(e) => Err(e),
     }
 }
 
@@ -136,12 +151,18 @@ fn main() {
         let trader = Trader::from(strategy_id, args.capital, markets);
         trader.apply_strategy(args.days, args.minute_interval);
 
-        if args.print_history {
-            if args.as_json {
-                println!("{}", trader.get_history_as_json());
-            } else {
-                println!("{:?}", trader.get_history());
+        if args.visualize {
+            // first we need to save the json, then visualize
+            let filename = format!("{}-{}.json", args.strategy, Local::now());
+            let history = trader.get_history_as_json();
+            match write_history(filename, history) {
+                Ok(()) => (), //visualizer::render_plot(),
+                Err(e) => println!("Error while writing history as JSON: {:?}", e),
             }
+        } else if args.as_json {
+            println!("{}", trader.get_history_as_json());
+        } else {
+            println!("{:?}", trader.get_history());
         }
     } else {
         println!(
@@ -154,7 +175,7 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use crate::{map_strategy_to_id, parse_markets, MarketFactory};
+    use crate::{gen_market, map_strategy_to_id, parse_markets};
     use trader::trader::StrategyIdentifier;
 
     #[test]
@@ -227,7 +248,7 @@ mod tests {
     #[test]
     fn test_market_factory_gen_market() {
         // test with empty str
-        let market = MarketFactory::gen_market("");
+        let market = gen_market("");
         assert!(
             market.is_none(),
             "There should be no market for an empty name"
@@ -235,7 +256,7 @@ mod tests {
 
         // test with non known name
         let market_name = "NON-EXISTING";
-        let market = MarketFactory::gen_market(market_name);
+        let market = gen_market(market_name);
         assert!(
             market.is_none(),
             "There should be no market generated for unknown name '{}'",
@@ -245,7 +266,7 @@ mod tests {
         // test all known market names
         let known_names = vec!["sgx", "smse", "tase", "zse"];
         for market_name in known_names {
-            let market = MarketFactory::gen_market(market_name);
+            let market = gen_market(market_name);
             assert!(
                 market.is_some(),
                 "There must be a market generated for name '{}'",
