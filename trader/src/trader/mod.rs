@@ -6,18 +6,17 @@
 //! Another goal of this implementation is to give a strategy every possible freedom.
 //!
 //! Furthermore, the trader is able export its history in JSON format.
-use crate::strategies::average_seller_strategy::AverageSellerStrategy;
 use crate::consts::{TRADER_NAME_AVERAGE_SELLER, TRADER_NAME_STINGY};
-use crate::strategies::most_simple_strategy::MostSimpleStrategy;
+use crate::strategies::average_seller_strategy::AverageSellerStrategy;
 use crate::strategies::strategy::Strategy;
 use crate::MarketRef;
 use env_logger::Env;
 use serde::Serialize;
 use std::cell::RefCell;
 
+use crate::strategies::stingy_strategy::StingyStrategy;
 use unitn_market_2022::good::good::Good;
 use unitn_market_2022::good::good_kind::GoodKind;
-use crate::strategies::stingy_strategy::StingyStrategy;
 
 #[derive(Clone, Debug, Eq, Ord, PartialOrd, PartialEq)]
 pub enum StrategyIdentifier {
@@ -85,10 +84,8 @@ impl Trader {
         match id {
             StrategyIdentifier::AverageSeller => {
                 Box::new(AverageSellerStrategy::new(markets, trader_name))
-            },
-            StrategyIdentifier::Stingy => {
-                Box::new(StingyStrategy::new(markets, trader_name))
-            },
+            }
+            StrategyIdentifier::Stingy => Box::new(StingyStrategy::new(markets, trader_name)),
         }
     }
 
@@ -401,7 +398,13 @@ mod tests {
 
     #[test]
     fn test_get_name_for_strategy() {
-        let expected = HashMap::from([(TRADER_NAME_AVERAGE_SELLER, StrategyIdentifier::AverageSeller), (TRADER_NAME_STINGY, StrategyIdentifier::Stingy)]);
+        let expected = HashMap::from([
+            (
+                TRADER_NAME_AVERAGE_SELLER,
+                StrategyIdentifier::AverageSeller,
+            ),
+            (TRADER_NAME_STINGY, StrategyIdentifier::Stingy),
+        ]);
 
         for (expected_name, id) in expected {
             let name = Trader::get_name_for_strategy(id.clone());

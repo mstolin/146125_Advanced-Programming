@@ -1,10 +1,10 @@
-use std::borrow::Borrow;
+use crate::strategies::strategy::Strategy;
+use crate::MarketRef;
 use log::{info, warn};
+use std::borrow::Borrow;
 use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::rc::Rc;
-use crate::MarketRef;
-use crate::strategies::strategy::Strategy;
 use unitn_market_2022::good::good::Good;
 use unitn_market_2022::good::good_kind::GoodKind;
 
@@ -27,10 +27,7 @@ struct ExchangeRate {
 impl ExchangeRate {
     /// Define a new `ExchangeRate` instance
     fn new(ex_rate: f32, good_kind: GoodKind) -> ExchangeRate {
-        ExchangeRate {
-            ex_rate,
-            good_kind,
-        }
+        ExchangeRate { ex_rate, good_kind }
     }
 }
 
@@ -61,7 +58,9 @@ impl Deal {
     }
 
     /// Return the exchange rate of the deal
-    fn get_ex_rate(&self) -> f32 { self.price / self.quantity }
+    fn get_ex_rate(&self) -> f32 {
+        self.price / self.quantity
+    }
 }
 
 /// Implementation of the `StingyStrategy`.
@@ -90,8 +89,7 @@ impl StingyStrategy {
     /// involved in the strategy.
     /// The idea is: for every market, try to find a deal spending only a little amount of EUR.
     /// This trader is **stingy**!
-    fn find_deals(&self, balance: f32, percentage: f32) -> Vec<Deal>{
-
+    fn find_deals(&self, balance: f32, percentage: f32) -> Vec<Deal> {
         if percentage > 1.0 {
             warn!("percentage can't be greater than 1.0");
             return Vec::new();
@@ -102,9 +100,9 @@ impl StingyStrategy {
         for market in self.markets.iter() {
             let goods = market.as_ref().borrow().get_goods();
             for good in goods {
-
                 if good.good_kind != GoodKind::EUR {
-                    let quantity = balance * percentage * good.exchange_rate_buy; /// TODO: check this
+                    let quantity = balance * percentage * good.exchange_rate_buy;
+                    /// TODO: check this
                     let buy_price = market
                         .as_ref()
                         .borrow()
@@ -115,7 +113,8 @@ impl StingyStrategy {
                         // This because SMSE return buy prices with 0.0 as price if there's no deals
                         if buy_price > 0.0 {
                             let market_name = market.as_ref().borrow().get_name().to_string();
-                            info!("Found a possible deal: {} {} at {} EUR in market: {}",
+                            info!(
+                                "Found a possible deal: {} {} at {} EUR in market: {}",
                                 quantity,
                                 good.good_kind,
                                 buy_price,
@@ -125,7 +124,7 @@ impl StingyStrategy {
                                 price: buy_price,
                                 quantity,
                                 good_kind: good.good_kind,
-                                market_name: market_name.clone()
+                                market_name: market_name.clone(),
                             });
                         }
                     }
@@ -140,7 +139,6 @@ impl StingyStrategy {
     /// type of good. If there are no deal with a "good" exchange rate, the method will select the deal that has
     /// the **lower** exchange rate in `Vec<Deal>`.
     fn filter_deals(&self, deals: Vec<Deal>) -> Option<Deal> {
-
         let mut best_deal: Option<Deal> = None;
 
         let filtered_deals = deals
@@ -210,17 +208,16 @@ impl StingyStrategy {
     fn buy_deal(&self, trader_goods: &mut [Good], percentage: f32) {
         let balance = trader_goods
             .iter_mut()
-            .find(|good|good.get_kind() == GoodKind::EUR)
+            .find(|good| good.get_kind() == GoodKind::EUR)
             .unwrap()
             .get_qty();
 
         let trader_eur = trader_goods
             .iter_mut()
-            .find(|good|good.get_kind() == GoodKind::EUR)
+            .find(|good| good.get_kind() == GoodKind::EUR)
             .unwrap();
 
-
-        let deals= self.find_deals(balance, percentage);
+        let deals = self.find_deals(balance, percentage);
         let deal = self.filter_deals(deals);
         if let Some(deal) = deal {
             let token = self.lock_deal(&deal);
@@ -236,7 +233,8 @@ impl StingyStrategy {
                 let buy_good = market.buy(token.clone(), trader_eur);
 
                 if let Ok(buy_good) = buy_good {
-                    info!("Buy successful! {} {} for {} EUR from market {}",
+                    info!(
+                        "Buy successful! {} {} for {} EUR from market {}",
                         buy_good.get_qty(),
                         buy_good.get_kind(),
                         deal.price,
@@ -245,7 +243,7 @@ impl StingyStrategy {
 
                     let trader_good = trader_goods
                         .iter_mut()
-                        .find(|good|good.get_kind() == buy_good.get_kind())
+                        .find(|good| good.get_kind() == buy_good.get_kind())
                         .unwrap();
 
                     let _ = trader_good.merge(buy_good.clone());
@@ -261,13 +259,11 @@ impl StingyStrategy {
 
 /// Methods for **sell**.
 impl StingyStrategy {
-
     /// Return a `Vec<Deal>` that contains all the possible deals that the trader can do with the markets
     /// involved in the strategy.
     /// The idea is: for every market, try to find a deal selling only a little amount of a certain good.
     /// This trader is **stingy**!
     fn find_deal_for_sell(&self, trader_goods: &[Good], percentage: f32) -> Vec<Deal> {
-
         let mut deals: Vec<Deal> = Vec::new();
 
         for market in self.markets.iter() {
@@ -292,7 +288,8 @@ impl StingyStrategy {
                         if let Ok(sell_price) = sell_price {
                             if sell_price > 0.0 {
                                 let market_name = market.as_ref().borrow().get_name().to_string();
-                                info!("Found a possible sell: {} {} at {} EUR in market: {}",
+                                info!(
+                                    "Found a possible sell: {} {} at {} EUR in market: {}",
                                     quantity,
                                     good.get_kind(),
                                     sell_price,
@@ -302,7 +299,7 @@ impl StingyStrategy {
                                     price: sell_price,
                                     quantity,
                                     good_kind: good.get_kind(),
-                                    market_name: market_name.clone()
+                                    market_name: market_name.clone(),
                                 });
                             }
                         }
@@ -317,7 +314,7 @@ impl StingyStrategy {
     /// A deal, to be considered good, must have an exchange rate **greater** than the average exchange rate for that
     /// type of good. If there are no deal with a "good" exchange rate, the method will select the deal that has
     /// the **higher** exchange rate in `Vec<Deal>`.
-    fn filter_deals_for_sell(&self, deals: Vec<Deal>) -> Option<Deal>{
+    fn filter_deals_for_sell(&self, deals: Vec<Deal>) -> Option<Deal> {
         let mut best_deal: Option<Deal> = None;
 
         let filtered_deals = deals
@@ -369,15 +366,17 @@ impl StingyStrategy {
             deal.good_kind,
             deal.quantity,
             deal.price,
-            self.trader_name.clone()
+            self.trader_name.clone(),
         );
 
         if let Ok(token) = token {
-            info!("Locked deal for sell: {} {} at {} EUR in market {}",
+            info!(
+                "Locked deal for sell: {} {} at {} EUR in market {}",
                 deal.quantity,
                 deal.good_kind,
                 deal.price,
-                market.get_name().to_string());
+                market.get_name().to_string()
+            );
             return Some(token);
         } else {
             warn!("Could not lock the deal for sell {:?}", token);
@@ -391,7 +390,6 @@ impl StingyStrategy {
     /// using `lock_deal_for_sell()` and finally **sell** the good from the market and merge the received amount
     /// of good. If the sell operation goes well, this method adds the deal to the sell history.
     fn sell_deal(&self, trader_goods: &mut [Good], percentage: f32) {
-
         let deals = self.find_deal_for_sell(trader_goods, percentage);
         let deal = self.filter_deals_for_sell(deals);
 
@@ -401,20 +399,21 @@ impl StingyStrategy {
             let market = self
                 .markets
                 .iter()
-                .find(|market|market.as_ref().borrow().get_name().to_string() == deal.market_name)
+                .find(|market| market.as_ref().borrow().get_name().to_string() == deal.market_name)
                 .unwrap();
             let mut market = market.as_ref().borrow_mut();
 
             if let Some(token) = token {
                 let good_to_sell = trader_goods
                     .iter_mut()
-                    .find(|good|good.get_kind() == deal.good_kind)
+                    .find(|good| good.get_kind() == deal.good_kind)
                     .unwrap();
 
                 let sell_good = market.sell(token.clone(), good_to_sell);
 
                 if let Ok(sell_good) = sell_good {
-                    info!("Sold {} {} at {} EUR to market {}",
+                    info!(
+                        "Sold {} {} at {} EUR to market {}",
                         deal.quantity,
                         good_to_sell.get_kind(),
                         sell_good.get_qty(),
@@ -477,10 +476,7 @@ impl StingyStrategy {
             let goods = market.clone().as_ref().borrow_mut().get_goods();
             for good in goods {
                 if good.good_kind != GoodKind::EUR {
-                    ex_rates.push(ExchangeRate::new(
-                        good.exchange_rate_buy,
-                        good.good_kind,
-                    ));
+                    ex_rates.push(ExchangeRate::new(good.exchange_rate_buy, good.good_kind));
                 }
             }
         }
@@ -499,7 +495,7 @@ impl StingyStrategy {
     /// Return as `f32` the average exchange rate for **buying** a certain good kind during the last 10 operations.
     fn get_avg_buy_ex_rate(&self, good_kind: GoodKind) -> f32 {
         let mut counter = 0;
-        let mut total : f32 = 0.0;
+        let mut total: f32 = 0.0;
 
         if self.ex_rate_buy_history.borrow().len() == 0 {
             return 0.0;
@@ -524,7 +520,6 @@ impl StingyStrategy {
 
 /// Helper methods for **selling**.
 impl StingyStrategy {
-
     /// This methods dda a new exchange rate item, passed as a parameter, in the [`ex_rate_sell_history`]
     /// only if there are no more than 10 exchange rates for every kind of good (total: 30).
     /// If there are more than 10 ex rate for every kind of good, it removes the first 3 items of
@@ -546,10 +541,7 @@ impl StingyStrategy {
             let goods = market.as_ref().borrow().get_goods();
             for good in goods {
                 if good.good_kind != GoodKind::EUR {
-                    ex_rates.push(ExchangeRate::new(
-                        good.exchange_rate_sell,
-                        good.good_kind,
-                    ));
+                    ex_rates.push(ExchangeRate::new(good.exchange_rate_sell, good.good_kind));
                 }
             }
         }
@@ -568,7 +560,7 @@ impl StingyStrategy {
     /// Return as `f32` the average exchange rate for **selling** a certain good kind during the last 10 operations.
     fn get_avg_sell_ex_rate(&self, good_kind: GoodKind) -> f32 {
         let mut counter = 0;
-        let mut total : f32 = 0.0;
+        let mut total: f32 = 0.0;
 
         if self.ex_rate_sell_history.borrow().len() == 0 {
             return 0.0;
@@ -646,55 +638,35 @@ impl Strategy for StingyStrategy {
 
 #[cfg(test)]
 mod tests {
-    use std::rc::Rc;
     use crate::consts::TRADER_NAME_STINGY;
+    use crate::strategies::stingy_strategy::{Deal, StingyStrategy};
+    use crate::strategies::strategy::Strategy;
     use crate::MarketRef;
-    use SGX::market::sgx::SGX;
-    use TASE::TASE;
-    use ZSE::market::ZSE;
     use smse::Smse;
+    use std::rc::Rc;
     use unitn_market_2022::good::good::Good;
     use unitn_market_2022::good::good_kind::GoodKind;
     use unitn_market_2022::market::Market;
-    use crate::strategies::stingy_strategy::{Deal, StingyStrategy};
-    use crate::strategies::strategy::Strategy;
+    use SGX::market::sgx::SGX;
+    use TASE::TASE;
+    use ZSE::market::ZSE;
 
-    fn init_sgx(
-        eur: f32,
-        usd: f32,
-        yen: f32,
-        yuan: f32
-    ) -> MarketRef {
+    fn init_sgx(eur: f32, usd: f32, yen: f32, yuan: f32) -> MarketRef {
         let sgx = SGX::new_with_quantities(eur, yen, usd, yuan);
         sgx
     }
 
-    fn init_smse(
-        eur: f32,
-        usd: f32,
-        yen: f32,
-        yuan: f32
-    ) -> MarketRef {
+    fn init_smse(eur: f32, usd: f32, yen: f32, yuan: f32) -> MarketRef {
         let smse = Smse::new_with_quantities(eur, yen, usd, yuan);
         smse
     }
 
-    fn init_tase(
-        eur: f32,
-        usd: f32,
-        yen: f32,
-        yuan: f32
-    ) -> MarketRef {
+    fn init_tase(eur: f32, usd: f32, yen: f32, yuan: f32) -> MarketRef {
         let tase = TASE::new_with_quantities(eur, yen, usd, yuan);
         tase
     }
 
-    fn init_zse(
-        eur: f32,
-        usd: f32,
-        yen: f32,
-        yuan: f32
-    ) -> MarketRef {
+    fn init_zse(eur: f32, usd: f32, yen: f32, yuan: f32) -> MarketRef {
         let zse = ZSE::new_with_quantities(eur, yen, usd, yuan);
         zse
     }
@@ -703,7 +675,7 @@ mod tests {
         eur: f32,
         usd: f32,
         yen: f32,
-        yuan: f32
+        yuan: f32,
     ) -> (MarketRef, MarketRef, MarketRef, MarketRef) {
         let sgx = SGX::new_with_quantities(eur, yen, usd, yuan);
         let smse = Smse::new_with_quantities(eur, yen, usd, yuan);
@@ -734,7 +706,6 @@ mod tests {
 
         let deal = strategy.find_deals(100_000.0, 0.05);
         assert!(deal.len() > 0, "There should be one deal");
-
     }
 
     #[test]
@@ -745,7 +716,7 @@ mod tests {
             Rc::clone(&sgx),
             Rc::clone(&smse),
             Rc::clone(&tase),
-            Rc::clone(&zse)
+            Rc::clone(&zse),
         ];
         let strategy = StingyStrategy::new(markets, trader_name);
 
@@ -759,7 +730,7 @@ mod tests {
     fn test_filter_deals_one_market() {
         let trader_name = TRADER_NAME_STINGY;
         let zse = init_zse(0.0, 100_000.0, 0.0, 0.0);
-        let markets = vec![ Rc::clone(&zse) ];
+        let markets = vec![Rc::clone(&zse)];
         let strategy = StingyStrategy::new(markets, trader_name);
 
         strategy.update_ex_rates_buy();
@@ -798,7 +769,11 @@ mod tests {
         let deal = strategy.filter_deals(deals);
         if let Some(deal) = deal {
             let token = strategy.lock_deal(&deal);
-            assert!(token.is_some(), "There should be a token {}", token.unwrap());
+            assert!(
+                token.is_some(),
+                "There should be a token {}",
+                token.unwrap()
+            );
         }
     }
 
@@ -835,7 +810,6 @@ mod tests {
 
         let deals = strategy.find_deal_for_sell(&vec![good_yen, good_usd, good_yuan], 0.05);
         assert!(deals.len() > 0, "Should be found a good deal for sell");
-
 
         let deal = strategy.filter_deals(deals);
         assert!(deal.is_some(), "Should be found the best deal");
@@ -886,8 +860,4 @@ mod tests {
             assert!(token.is_some());
         }
     }
-
 }
-
-
-

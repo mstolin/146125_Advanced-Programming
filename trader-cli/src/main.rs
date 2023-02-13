@@ -32,6 +32,10 @@ use clap::Parser;
 use env_logger::Env;
 use smse::Smse;
 use std::cell::RefCell;
+use std::fs::File;
+use std::io;
+use std::io::Write;
+use std::path::PathBuf;
 use std::rc::Rc;
 use trader::trader::{StrategyIdentifier, Trader};
 use unitn_market_2022::market::Market;
@@ -47,7 +51,7 @@ type MarketRef = Rc<RefCell<dyn Market>>;
 #[clap(about, author, version)]
 pub struct Args {
     /// Name of the strategy the trader is supposed to use.
-    /// Available strategy names: average-seller.
+    /// Available strategy names: average-seller, stingy.
     pub strategy: String,
     /// List of markets the trader should work with.
     /// Available market names: sgx, smse, tase, zse.
@@ -116,7 +120,6 @@ fn parse_markets(markets: &[String]) -> Vec<MarketRef> {
 /// Valid strategy names: `average-seller`.
 fn map_strategy_to_id(strategy: &str) -> Option<StrategyIdentifier> {
     match strategy {
-        "mostsimple" => Some(StrategyIdentifier::MostSimple),
         "stingy" => Some(StrategyIdentifier::Stingy),
         "average-seller" => Some(StrategyIdentifier::AverageSeller),
         _ => None,
@@ -175,7 +178,7 @@ fn main() {
         }
     } else {
         println!(
-            "No strategy called '{}' available. Try average-seller.",
+            "No strategy called '{}' available. Try: average-seller, stingy.",
             args.strategy
         );
         std::process::exit(1);
