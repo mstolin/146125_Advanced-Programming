@@ -34,7 +34,7 @@ use smse::Smse;
 use std::cell::RefCell;
 use std::fs::File;
 use std::io;
-use std::io::Write;
+use std::io::prelude::Write;
 use std::path::PathBuf;
 use std::rc::Rc;
 use trader::trader::{StrategyIdentifier, Trader};
