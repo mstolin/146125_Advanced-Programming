@@ -1,6 +1,6 @@
 use std::error::Error;
-use druid::{AppLauncher, Widget, WidgetExt, WindowDesc};
-use druid::widget::{Flex, Label, Padding, Scroll, SizedBox};
+use druid::{AppLauncher, Widget, WindowDesc};
+use druid::widget::{Flex, Label, Scroll, SizedBox};
 use plotters::prelude::*;
 use plotters::prelude::full_palette::{CYAN_900};
 use plotters::style::full_palette::{GREEN_600, INDIGO_100, LIGHTBLUE_600, PURPLE_600, RED_500};
@@ -40,14 +40,7 @@ impl Strategy {
         }
     }
 }
-fn load_strategies() -> Vec<Strategy>{
-    let mut trades = vec![];
-    let files_found = strategy_reader::find_all_available();
-    for file in files_found{
-        trades.push(Strategy::new(&file));
-    }
-    trades
-}
+
 
 pub fn render_plot()-> Result<(),Box<dyn Error>>{
     let main_window = WindowDesc::new(layout_builder)
@@ -61,9 +54,18 @@ pub fn render_plot()-> Result<(),Box<dyn Error>>{
     Ok(())
 }
 
+fn load_strategies() -> Vec<Strategy>{
+    let mut trades = vec![];
+    let files_found = strategy_reader::find_all_available();
+    for file in files_found{
+        trades.push(Strategy::new(&file));
+    }
+    trades
+}
+
 fn layout_builder() -> impl Widget<()>{
     let trades = load_strategies();
-    let selected = 0;
+    let selected = 0%trades.len();
 
     let tldr1 = tldr(&trades,selected);
 
@@ -196,7 +198,7 @@ fn layout_builder() -> impl Widget<()>{
             .height(500.0));
 
     let trades = load_strategies(); //recreated because of move from the previous plot
-    let selected = 5;
+    let selected = 5%trades.len();
     let tldr2 = tldr(&trades,selected);
 
     row.add_spacer(10.0);
