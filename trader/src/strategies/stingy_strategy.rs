@@ -623,7 +623,9 @@ impl Strategy for StingyStrategy {
         self.markets.borrow()
     }
 
-    /// This methods try to sell all the goods owned by the trader (except for `EUR` before closing the strategy.
+    /// This methods try to sell all the goods owned by the trader (except for `EUR`) before closing the strategy.
+    /// The assumption is: try to find an offer for every good. Since the strategy spends a little percentage of eur,
+    /// it will be sufficient to try to sell for 3 times. If there are no deals for all goods, it will not to sell the remaining goods.
     fn sell_remaining_goods(&self, goods: &mut Vec<Good>) {
         for _ in 0..3 {
             self.sell_deal(goods, PERCENTAGE_SELL_ALL_GOODS);
