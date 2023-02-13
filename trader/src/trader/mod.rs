@@ -6,7 +6,7 @@
 //! Another goal of this implementation is to give a strategy every possible freedom.
 //!
 //! Furthermore, the trader is able export its history in JSON format.
-use crate::consts::TRADER_NAME_AVERAGE_SELLER;
+use crate::consts::{TRADER_NAME_AVERAGE_SELLER, TRADER_NAME_STINGY};
 use crate::strategies::average_seller_strategy::AverageSellerStrategy;
 use crate::strategies::strategy::Strategy;
 use crate::MarketRef;
@@ -14,12 +14,14 @@ use env_logger::Env;
 use serde::Serialize;
 use std::cell::RefCell;
 
+use crate::strategies::stingy_strategy::StingyStrategy;
 use unitn_market_2022::good::good::Good;
 use unitn_market_2022::good::good_kind::GoodKind;
 
 #[derive(Clone, Debug, Eq, Ord, PartialOrd, PartialEq)]
 pub enum StrategyIdentifier {
     AverageSeller,
+    Stingy,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -83,6 +85,7 @@ impl Trader {
             StrategyIdentifier::AverageSeller => {
                 Box::new(AverageSellerStrategy::new(markets, trader_name))
             }
+            StrategyIdentifier::Stingy => Box::new(StingyStrategy::new(markets, trader_name)),
         }
     }
 
@@ -90,6 +93,7 @@ impl Trader {
     fn get_name_for_strategy(id: StrategyIdentifier) -> &'static str {
         match id {
             StrategyIdentifier::AverageSeller => TRADER_NAME_AVERAGE_SELLER,
+            StrategyIdentifier::Stingy => TRADER_NAME_STINGY,
         }
     }
 
@@ -224,7 +228,7 @@ impl Trader {
 
 #[cfg(test)]
 mod tests {
-    use crate::consts::TRADER_NAME_AVERAGE_SELLER;
+    use crate::consts::{TRADER_NAME_AVERAGE_SELLER, TRADER_NAME_STINGY};
     use crate::trader::{StrategyIdentifier, Trader};
     use crate::MarketRef;
     use smse::Smse;
@@ -394,10 +398,13 @@ mod tests {
 
     #[test]
     fn test_get_name_for_strategy() {
-        let expected = HashMap::from([(
-            TRADER_NAME_AVERAGE_SELLER,
-            StrategyIdentifier::AverageSeller,
-        )]);
+        let expected = HashMap::from([
+            (
+                TRADER_NAME_AVERAGE_SELLER,
+                StrategyIdentifier::AverageSeller,
+            ),
+            (TRADER_NAME_STINGY, StrategyIdentifier::Stingy),
+        ]);
 
         for (expected_name, id) in expected {
             let name = Trader::get_name_for_strategy(id.clone());
@@ -421,6 +428,37 @@ mod tests {
         ];
 
         let trader = Trader::from(StrategyIdentifier::AverageSeller, 1_000_000.0, markets);
+
+        assert_eq!(0, trader.get_days(), "Trader should not have started now");
+        trader.apply_strategy(7, 60);
+        assert_eq!(
+            days,
+            trader.get_days(),
+            "Trader must have been running for {} days",
+            days
+        );
+
+        let history = trader.get_history();
+        assert_eq!(
+            days + 1,
+            history.len() as u32,
+            "The length of the history is supposed to be one more than the days running ({})",
+            days + 1
+        );
+    }
+
+    #[test]
+    fn test_apply_stingy_strategy_for_one_week() {
+        let days = 7;
+        let (sgx, smse, tase, _zse) = init_random_markets();
+        let markets = vec![
+            Rc::clone(&sgx),
+            Rc::clone(&smse),
+            Rc::clone(&tase),
+            //Rc::clone(&zse), // Total "out-of-the-world" offers
+        ];
+
+        let trader = Trader::from(StrategyIdentifier::Stingy, 1_000_000.0, markets);
 
         assert_eq!(0, trader.get_days(), "Trader should not have started now");
         trader.apply_strategy(days, 60);
