@@ -4,9 +4,9 @@ version = 3
 
 [[package]]
 name = "SGX"
-version = "0.1.4"
+version = "0.1.5"
 source = "registry+git://advancedprogramming.disi.unitn.it/index"
-checksum = "8eaaa7e03f41fac7b712d9864c485779b84c1182a8df4206b31bfdf9d4bd75b5"
+checksum = "704171b5681e55e948e94187e57150a85f68ab705bb709a7c2ac0ace2bdfb350"
 dependencies = [
  "chrono",
  "rand",
@@ -2231,6 +2231,7 @@ dependencies = [
  "SGX",
  "TASE",
  "ZSE",
+ "chrono",
  "clap",
  "env_logger",
  "log",

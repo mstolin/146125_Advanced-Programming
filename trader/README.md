@@ -3,14 +3,20 @@
 This is the library containing all the code of running a trader
 agent on certain markets.
 
+## Available Strategies
+
+| Identifier                          | File                                                                    | Author        | Description                                            |
+|-------------------------------------|-------------------------------------------------------------------------|---------------|--------------------------------------------------------|
+| `StrategyIdentifier::AverageSeller` | [average_seller_strategy.rs](src/strategies/average_seller_strategy.rs) | Marcel Stolin | [AverageSellerStrategy.md](./AverageSellerStrategy.md) |
+
 ## Usage
 
 ```rust
 let sgx = SGX::new_random();
-let markets = Vec::from([Rc::clone(&sgx)]);
+let markets = vec![Rc::clone(&sgx)];
 
 let trader = Trader::from(
-    StrategyIdentifier::Most_Simple,
+    StrategyIdentifier::AverageSeller,
     1_000_000.0,
     markets,
 );
@@ -18,6 +24,7 @@ let trader = Trader::from(
 trader.apply_strategy(7, 30); // Run trader for 7 days, every 30 minutes
 
 let history = trader.get_history(); // get the history for further computations
+let json = trader.get_history_as_json(); // or get the history as JSON string
 ```
 
 ### How to create a new strategy
@@ -36,7 +43,7 @@ pub struct YourNewStrategy {
 }
 
 impl Strategy for MostSimpleStrategy {
-    fn new(markets: Vec<MarketRef>) -> Self {
+    fn new(markets: Vec<MarketRef>, trader_name: &str) -> Self {
         // Your custom logic here
     }
 
@@ -44,7 +51,11 @@ impl Strategy for MostSimpleStrategy {
         // Your custom logic here
     }
 
-    fn apply(&self, goods: &mut Vec<Good>, trader_name: &String) {
+    fn sell_remaining_goods(&self, goods: &mut Vec<Good>) {
+        // Your custom logic here
+    }
+
+    fn apply(&self, goods: &mut Vec<Good>) {
         // Your custom logic here
     }
 }
@@ -91,16 +102,15 @@ let possible_strategies = [
     (StrategyIdentifier::Most_Simple, TRADER_NAME_MOST_SIMPLE),
     (StrategyIdentifier::YOUR_NEW_TRADER, TRADER_NAME_YOUR_NEW_TRADER), // Add your new trader
 ];
-
 ...
 ```
 
 ### History
 
 The result of the trader is a vector representing the history
-of its buying and selling actions. There exist 4 different
+of its buying and selling actions. It includes the 4 different
 goods (EUR, USD, YEN, YUAN - in alphabetical order) that are
-tradeable. The trader starts with each good at quantity 0,
+tradeable. The trader starts with each good at quantity 0.0,
 except for EUR that contains the starting capital initially.
 After each day, a row (representing a day) is added to the 
 vector containing the updated quantities.
@@ -109,9 +119,76 @@ For example:
 
 ```rust
 [
-  //  EUR  |  USD  |  YEN  |  YUAN 
-    [300000,      0,      0,      0], // Initially at day 0
-    [250000, 220200,   5000,    450], // After day 1
-    ... // until the last day
+    HistoryDay { day: 0, eur: 1000000.0, usd: 0.0, yen: 0.0, yuan: 0.0 },
+    HistoryDay { day: 1, eur: 171150.75, usd: 20091.201, yen: 0.0, yuan: 25114.344 },
+    HistoryDay { day: 2, eur: 7891.1123, usd: 20091.201, yen: 0.0, yuan: 25114.344 },
+    HistoryDay { day: 3, eur: 29669.178, usd: 20091.201, yen: 0.0, yuan: 25114.344 },
+    HistoryDay { day: 4, eur: 20376.188, usd: 20091.201, yen: 0.0, yuan: 25114.344 },
+    HistoryDay { day: 5, eur: 11038.449, usd: 20091.201, yen: 0.0, yuan: 25114.344 },
+    HistoryDay { day: 6, eur: 4425.7246, usd: 20091.201, yen: 0.0, yuan: 25114.344 },
+    HistoryDay { day: 7, eur: 14692.314, usd: 20091.201, yen: 0.0, yuan: 0.0 }
+]
+```
+
+It is also possible to export the history in JSON format:
+
+```json
+[
+  {
+    "day": 0,
+    "eur": 1000000,
+    "usd": 0,
+    "yen": 0,
+    "yuan": 0
+  },
+  {
+    "day": 1,
+    "eur": 395919.12,
+    "usd": 0,
+    "yen": 6106915,
+    "yuan": 23970.906
+  },
+  {
+    "day": 2,
+    "eur": 1206839.5,
+    "usd": 0,
+    "yen": 0,
+    "yuan": 23970.906
+  },
+  {
+    "day": 3,
+    "eur": 1206839.5,
+    "usd": 0,
+    "yen": 0,
+    "yuan": 23970.906
+  },
+  {
+    "day": 4,
+    "eur": 1206839.5,
+    "usd": 0,
+    "yen": 0,
+    "yuan": 23970.906
+  },
+  {
+    "day": 5,
+    "eur": 1206839.5,
+    "usd": 0,
+    "yen": 0,
+    "yuan": 23970.906
+  },
+  {
+    "day": 6,
+    "eur": 1206839.5,
+    "usd": 0,
+    "yen": 0,
+    "yuan": 23970.906
+  },
+  {
+    "day": 7,
+    "eur": 1244055,
+    "usd": 0,
+    "yen": 0,
+    "yuan": 0
+  }
 ]
 ```

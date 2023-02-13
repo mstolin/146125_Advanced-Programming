@@ -20,7 +20,7 @@ To see its features, execute `$ trader-cli --help`, it will print out the follow
 Usage: trader-cli [OPTIONS] <STRATEGY> [MARKETS]...
 
 Arguments:
-  <STRATEGY>    Name of the strategy the trader is supposed to use. Available strategy names: mostsimple
+  <STRATEGY>    Name of the strategy the trader is supposed to use. Available strategy names: average-seller
   [MARKETS]...  List of markets the trader should work with. Available market names: sgx, smse, tase, zse
 
 Options:
@@ -44,13 +44,13 @@ Options:
 
 ## Examples
 
-*Run `MostSimple` for 30 days, every 60 minutes on SGX and TASE and print history as JSON*
+*Run `AverageSeller` for 30 days, every 60 minutes on SGX and TASE and print history as JSON*
 ```shell
-$ trader-cli mostsimple sgx tase -d 30 -m 60 --as-json
+$ trader-cli average-seller sgx tase -d 30 -m 60 --as-json
 ```
 
-*Run `MostSimple` for 7 days, every 10 minutes on SGX, SMSE, and TASE wth 30.000.00 EUR start capital, and print history
+*Run `AverageSeller` for 7 days, every 10 minutes on SGX, SMSE, and TASE wth 30.000.00 EUR start capital, and print history
 as plain text*
 ```shell
-$ trader-cli mostsimple sgx smse tase -d 7 -m 10 -c 3000000
+$ trader-cli average-seller sgx smse tase -d 7 -m 10 -c 3000000
 ```

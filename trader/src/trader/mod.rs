@@ -1,4 +1,13 @@
-use crate::consts::{TRADER_NAME_MOST_SIMPLE, TRADER_NAME_STINGY};
+//! This is the implementation of a trader.
+//! A trader simply executes the strategy with which it is getting initialized.
+//! The idea is, that a trader owns all goods and gives a strategy a mutable reference to them.
+//! Then, the trader executes the strategy for *x* days, every *y* minutes of the day. After every
+//! day, the trader pushes a transformed copy of the goods to the history.
+//! Another goal of this implementation is to give a strategy every possible freedom.
+//!
+//! Furthermore, the trader is able export its history in JSON format.
+use crate::strategies::average_seller_strategy::AverageSellerStrategy;
+use crate::consts::{TRADER_NAME_AVERAGE_SELLER, TRADER_NAME_STINGY};
 use crate::strategies::most_simple_strategy::MostSimpleStrategy;
 use crate::strategies::strategy::Strategy;
 use crate::MarketRef;
@@ -12,7 +21,7 @@ use crate::strategies::stingy_strategy::StingyStrategy;
 
 #[derive(Clone, Debug, Eq, Ord, PartialOrd, PartialEq)]
 pub enum StrategyIdentifier {
-    MostSimple,
+    AverageSeller,
     Stingy,
 }
 
@@ -58,7 +67,7 @@ impl Trader {
     /// Creates a vec with all available goods (EUR, USD, YEN, YUAN).
     /// By default, all goods have a quantity of 0.0. Except EUR, that
     /// starts with the given default quantity that is initially defined
-    /// in [`from`](from).
+    /// in [`Trader::from`].
     fn create_goods(default_quantity: f32) -> Vec<Good> {
         let eur = Good::new(GoodKind::EUR, default_quantity);
         let usd = Good::new(GoodKind::USD, 0.0);
@@ -74,8 +83,8 @@ impl Trader {
         trader_name: &str,
     ) -> Box<dyn Strategy> {
         match id {
-            StrategyIdentifier::MostSimple => {
-                Box::new(MostSimpleStrategy::new(markets, trader_name))
+            StrategyIdentifier::AverageSeller => {
+                Box::new(AverageSellerStrategy::new(markets, trader_name))
             },
             StrategyIdentifier::Stingy => {
                 Box::new(StingyStrategy::new(markets, trader_name))
@@ -86,7 +95,7 @@ impl Trader {
     /// Returns the name of the trader for the given strategy identifier.
     fn get_name_for_strategy(id: StrategyIdentifier) -> &'static str {
         match id {
-            StrategyIdentifier::MostSimple => TRADER_NAME_MOST_SIMPLE,
+            StrategyIdentifier::AverageSeller => TRADER_NAME_AVERAGE_SELLER,
             StrategyIdentifier::Stingy => TRADER_NAME_STINGY,
         }
     }
@@ -125,12 +134,12 @@ impl Trader {
         let _ = env_logger::try_init_from_env(env);
 
         // init default goods
-        let name = Self::get_name_for_strategy(StrategyIdentifier::MostSimple);
+        let name = Self::get_name_for_strategy(StrategyIdentifier::AverageSeller);
         let strategy = Self::init_strategy(strategy_id, markets, name);
         let goods = Self::create_goods(start_capital);
         let history = Vec::from([Self::transform_good_to_history_day(0, &goods)]);
 
-        // Make all market subscribe
+        // Make all markets subscribe
         strategy.subscribe_all_markets();
 
         Self {
@@ -222,7 +231,7 @@ impl Trader {
 
 #[cfg(test)]
 mod tests {
-    use crate::consts::{TRADER_NAME_MOST_SIMPLE, TRADER_NAME_STINGY};
+    use crate::consts::{TRADER_NAME_AVERAGE_SELLER, TRADER_NAME_STINGY};
     use crate::trader::{StrategyIdentifier, Trader};
     use crate::MarketRef;
     use smse::Smse;
@@ -241,7 +250,6 @@ mod tests {
         let smse = Smse::new_random();
         let tase = TASE::new_random();
         let zse = ZSE::new_random();
-        //subscribe_each_other!(&sgx, &smse, &tase, &zse); // todo fix this
         (sgx, smse, tase, zse)
     }
 
@@ -256,8 +264,8 @@ mod tests {
         ];
 
         // test if it works
-        let trader = Trader::from(StrategyIdentifier::MostSimple, 300_000.0, markets);
-        let trader_name = Trader::get_name_for_strategy(StrategyIdentifier::MostSimple);
+        let trader = Trader::from(StrategyIdentifier::AverageSeller, 300_000.0, markets);
+        let trader_name = Trader::get_name_for_strategy(StrategyIdentifier::AverageSeller);
         assert_eq!(
             trader_name,
             trader.get_name(),
@@ -287,13 +295,13 @@ mod tests {
             Rc::clone(&tase),
             Rc::clone(&zse),
         ];
-        Trader::from(StrategyIdentifier::MostSimple, 0.0, markets);
+        Trader::from(StrategyIdentifier::AverageSeller, 0.0, markets);
     }
 
     #[test]
     #[should_panic]
     fn test_new_trader_with_no_markets() {
-        Trader::from(StrategyIdentifier::MostSimple, 300_000.0, vec![]);
+        Trader::from(StrategyIdentifier::AverageSeller, 300_000.0, vec![]);
     }
 
     #[test]
@@ -303,19 +311,19 @@ mod tests {
         assert_eq!(4, goods.len());
 
         let eur = Good::new(GoodKind::EUR, default_qty);
-        assert_eq!(true, goods.contains(&eur), "{:?} not found in goods", eur);
+        assert!(goods.contains(&eur), "{:?} not found in goods", eur);
         let usd = Good::new(GoodKind::USD, 0.0);
-        assert_eq!(true, goods.contains(&usd), "{:?} not found in goods", usd);
+        assert!(goods.contains(&usd), "{:?} not found in goods", usd);
         let yuan = Good::new(GoodKind::YUAN, 0.0);
-        assert_eq!(true, goods.contains(&yuan), "{:?} not found in goods", yuan);
+        assert!(goods.contains(&yuan), "{:?} not found in goods", yuan);
         let yen = Good::new(GoodKind::YEN, 0.0);
-        assert_eq!(true, goods.contains(&yen), "{:?} not found in goods", yen);
+        assert!(goods.contains(&yen), "{:?} not found in goods", yen);
     }
 
     #[test]
     fn test_transform_good_to_history_day() {
         // test with empty goods
-        let history = Trader::transform_good_to_history_day(12, &vec![]);
+        let history = Trader::transform_good_to_history_day(12, &[]);
         assert_eq!(12, history.day, "Day must be {}", 12);
         assert_eq!(0.0, history.eur, "EUR must be {}", 0.0);
         assert_eq!(0.0, history.usd, "USD must be {}", 0.0);
@@ -366,7 +374,7 @@ mod tests {
         let (sgx, smse, tase, _zse) = init_random_markets();
         let markets = vec![Rc::clone(&sgx), Rc::clone(&smse), Rc::clone(&tase)];
 
-        let trader = Trader::from(StrategyIdentifier::MostSimple, 1_000_000.0, markets);
+        let trader = Trader::from(StrategyIdentifier::AverageSeller, 1_000_000.0, markets);
         trader.apply_strategy(0, 0);
     }
 
@@ -376,7 +384,7 @@ mod tests {
         let (sgx, smse, tase, _zse) = init_random_markets();
         let markets = vec![Rc::clone(&sgx), Rc::clone(&smse), Rc::clone(&tase)];
 
-        let trader = Trader::from(StrategyIdentifier::MostSimple, 1_000_000.0, markets);
+        let trader = Trader::from(StrategyIdentifier::AverageSeller, 1_000_000.0, markets);
         trader.apply_strategy(7, 0);
     }
 
@@ -387,13 +395,13 @@ mod tests {
         let markets = vec![Rc::clone(&sgx), Rc::clone(&smse), Rc::clone(&tase)];
         let minutes = 24 * 60;
 
-        let trader = Trader::from(StrategyIdentifier::MostSimple, 1_000_000.0, markets);
+        let trader = Trader::from(StrategyIdentifier::AverageSeller, 1_000_000.0, markets);
         trader.apply_strategy(7, minutes + 1);
     }
 
     #[test]
     fn test_get_name_for_strategy() {
-        let expected = HashMap::from([(TRADER_NAME_MOST_SIMPLE, StrategyIdentifier::MostSimple), (TRADER_NAME_STINGY, StrategyIdentifier::Stingy)]);
+        let expected = HashMap::from([(TRADER_NAME_AVERAGE_SELLER, StrategyIdentifier::AverageSeller), (TRADER_NAME_STINGY, StrategyIdentifier::Stingy)]);
 
         for (expected_name, id) in expected {
             let name = Trader::get_name_for_strategy(id.clone());
@@ -406,9 +414,9 @@ mod tests {
     }
 
     #[test]
-    fn test_apply_simple_strategy_for_one_week() {
+    fn test_apply_average_seller_strategy_for_one_week() {
         let days = 7;
-        let (sgx, smse, tase, _zse) = init_random_markets();
+        let (sgx, smse, tase, _) = init_random_markets();
         let markets = vec![
             Rc::clone(&sgx),
             Rc::clone(&smse),
@@ -416,7 +424,7 @@ mod tests {
             //Rc::clone(&zse), // Total "out-of-the-world" offers
         ];
 
-        let trader = Trader::from(StrategyIdentifier::MostSimple, 1_000_000.0, markets);
+        let trader = Trader::from(StrategyIdentifier::AverageSeller, 1_000_000.0, markets);
 
         assert_eq!(0, trader.get_days(), "Trader should not have started now");
         trader.apply_strategy(7, 60);
@@ -450,7 +458,7 @@ mod tests {
         let trader = Trader::from(StrategyIdentifier::Stingy, 1_000_000.0, markets);
 
         assert_eq!(0, trader.get_days(), "Trader should not have started now");
-        trader.apply_strategy(7, 60);
+        trader.apply_strategy(days, 60);
         assert_eq!(
             days,
             trader.get_days(),

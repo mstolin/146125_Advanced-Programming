@@ -1,8 +1,8 @@
-# MostSimpleStrategy
+# AverageSellerStrategy
 
 ## Buying strategy
 
-This strategy always tries to buy the cheapest good available. The problems what arise with
+This strategy always tries to buy the cheapest good available. The problems that arise with
 that strategy is:
 
 1. What good do we buy

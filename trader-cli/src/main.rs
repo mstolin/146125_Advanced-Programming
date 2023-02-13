@@ -1,3 +1,33 @@
+//! This is a CLI tool to execute a trader using the *trader* library.
+//!
+//! # Installation
+//!
+//! From the workspace directory execute the following:
+//!
+//! ```shell
+//! $ cargo install --path ./trader-cli
+//! ```
+//!
+//! After that, you can use the command as `$ trader-cli`.
+//!
+//! # Usage
+//!
+//! To see its features, execute `$ trader-cli --help`.
+//!
+//! # Examples
+//!
+//! *Run `AverageSeller` for 30 days, every 60 minutes on SGX and TASE and print history as JSON*
+//! ```shell
+//! $ trader-cli average-seller sgx tase -d 30 -m 60 --as-json
+//! ```
+//!
+//! *Run `AverageSeller` for 7 days, every 10 minutes on SGX, SMSE, and TASE wth 30.000.00 EUR start capital, and print history
+//! as plain text*
+//! ```shell
+//! $ trader-cli average-seller sgx smse tase -d 7 -m 10 -c 3000000
+//! ```
+
+use chrono::Local;
 use clap::Parser;
 use env_logger::Env;
 use smse::Smse;
@@ -12,11 +42,12 @@ use ZSE::market::ZSE;
 /// Represents a market
 type MarketRef = Rc<RefCell<dyn Market>>;
 
+/// Possible arguments for the executable.
 #[derive(Debug, Parser)]
 #[clap(about, author, version)]
 pub struct Args {
     /// Name of the strategy the trader is supposed to use.
-    /// Available strategy names: mostsimple.
+    /// Available strategy names: average-seller.
     pub strategy: String,
     /// List of markets the trader should work with.
     /// Available market names: sgx, smse, tase, zse.
@@ -38,32 +69,30 @@ pub struct Args {
     /// Otherwise, it will be printed as plain text.
     #[arg(short, long, default_value_t = false)]
     pub as_json: bool,
-    /// Print the history after a successful run.
-    #[arg(short, long, default_value_t = true)]
-    pub print_history: bool,
+    /// Output path for the history as a JSON file.
+    /// Can either be a file, or a directory.
+    /// If a directory is given, the filename will be
+    /// STRATEGY_NAME-TIMESTAMP.json.
+    #[arg(short, long)]
+    pub output: Option<PathBuf>,
 }
 
-/// The `MarketFactory` is responsible to generate a `MarketRef` instance
-/// for a given name.
-struct MarketFactory();
-
-impl MarketFactory {
-    /// Generates a random market instance for the given name.
-    /// Currently the markets sgx, smse, tase, and zse are available.
-    fn gen_market(market_name: &str) -> Option<MarketRef> {
-        let market_name = market_name.to_ascii_lowercase();
-        match market_name.as_str() {
-            "sgx" => Some(SGX::new_random()),
-            "smse" => Some(Smse::new_random()),
-            "tase" => Some(TASE::new_random()),
-            "zse" => Some(ZSE::new_random()),
-            _ => None,
-        }
+/// Generates a [`MarketRef`] instance if the given is valid, otherwise
+/// it returns `None`. The market contains random quantities.
+/// Valid names for markets are: `sgx`, `smse`, `tase`, and `zse`.
+fn gen_market(market_name: &str) -> Option<MarketRef> {
+    let market_name = market_name.to_ascii_lowercase();
+    match market_name.as_str() {
+        "sgx" => Some(SGX::new_random()),
+        "smse" => Some(Smse::new_random()),
+        "tase" => Some(TASE::new_random()),
+        "zse" => Some(ZSE::new_random()),
+        _ => None,
     }
 }
 
-/// Parses the given market names and returns a `MarketRef` if
-/// available. it uses the [`MarketFactory`](MarketFactory) to
+/// Parses the given market names and returns a [`MarketRef`] if
+/// available. it uses the [`gen_market`] method to
 /// generate a market.
 fn parse_markets(markets: &[String]) -> Vec<MarketRef> {
     let mut market_refs = Vec::new();
@@ -74,7 +103,7 @@ fn parse_markets(markets: &[String]) -> Vec<MarketRef> {
     // remove duplicates
     markets.dedup();
     for market_name in markets.iter() {
-        if let Some(market) = MarketFactory::gen_market(market_name.as_str()) {
+        if let Some(market) = gen_market(market_name.as_str()) {
             market_refs.push(market);
         } else {
             println!("Market '{market_name}' is not available. Try sgx, smse, tase, or zse.");
@@ -83,15 +112,29 @@ fn parse_markets(markets: &[String]) -> Vec<MarketRef> {
     market_refs
 }
 
-/// Tries to map the given strategy name to a `StrategyIdentifier`.
+/// Tries to map the given strategy name to an optional [`StrategyIdentifier`].
+/// Valid strategy names: `average-seller`.
 fn map_strategy_to_id(strategy: &str) -> Option<StrategyIdentifier> {
     match strategy {
         "mostsimple" => Some(StrategyIdentifier::MostSimple),
         "stingy" => Some(StrategyIdentifier::Stingy),
+        "average-seller" => Some(StrategyIdentifier::AverageSeller),
         _ => None,
     }
 }
 
+/// Writes the history to the visualizer input path.
+fn write_history(file_path: &PathBuf, history: &String) -> Result<(), io::Error> {
+    match File::create(file_path) {
+        Ok(mut file) => match file.write_all(history.as_bytes()) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(e),
+        },
+        Err(e) => Err(e),
+    }
+}
+
+/// Main endpoint for the executable.
 fn main() {
     let args = Args::parse();
 
@@ -110,16 +153,29 @@ fn main() {
         let trader = Trader::from(strategy_id, args.capital, markets);
         trader.apply_strategy(args.days, args.minute_interval);
 
-        if args.print_history {
-            if args.as_json {
-                println!("{}", trader.get_history_as_json());
-            } else {
-                println!("{:?}", trader.get_history());
+        if let Some(mut output_path) = args.output {
+            if output_path.is_dir() {
+                let filename = format!("{}-{}.json", args.strategy, Local::now().timestamp());
+                let filename = PathBuf::from(filename);
+                output_path = output_path.join(filename);
             }
+
+            let history = trader.get_history_as_json();
+            match write_history(&output_path, &history) {
+                Ok(_) => {
+                    let output = output_path.as_os_str().to_str().unwrap_or_default();
+                    println!("Successfully wrote history to {output}");
+                }
+                Err(e) => println!("Error while writing history as JSON: {}", e),
+            }
+        } else if args.as_json {
+            println!("{}", trader.get_history_as_json());
+        } else {
+            println!("{:?}", trader.get_history());
         }
     } else {
         println!(
-            "No strategy called '{}' available. Try mostsimple.",
+            "No strategy called '{}' available. Try average-seller.",
             args.strategy
         );
         std::process::exit(1);
@@ -128,7 +184,7 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use crate::{map_strategy_to_id, parse_markets, MarketFactory};
+    use crate::{gen_market, map_strategy_to_id, parse_markets};
     use trader::trader::StrategyIdentifier;
 
     #[test]
@@ -138,7 +194,7 @@ mod tests {
         assert_eq!(
             0,
             markets.len(),
-            "No markets should be geenrated for an empty slice"
+            "No markets should be generated for an empty slice"
         );
 
         // Test with no existing markets
@@ -186,8 +242,8 @@ mod tests {
         );
 
         // test existing strategy
-        let strategy = "mostsimple";
-        let expected = StrategyIdentifier::MostSimple;
+        let strategy = "average-seller";
+        let expected = StrategyIdentifier::AverageSeller;
         let id = map_strategy_to_id(strategy);
         assert_eq!(
             Some(expected.clone()),
@@ -201,7 +257,7 @@ mod tests {
     #[test]
     fn test_market_factory_gen_market() {
         // test with empty str
-        let market = MarketFactory::gen_market("");
+        let market = gen_market("");
         assert!(
             market.is_none(),
             "There should be no market for an empty name"
@@ -209,7 +265,7 @@ mod tests {
 
         // test with non known name
         let market_name = "NON-EXISTING";
-        let market = MarketFactory::gen_market(market_name);
+        let market = gen_market(market_name);
         assert!(
             market.is_none(),
             "There should be no market generated for unknown name '{}'",
@@ -219,7 +275,7 @@ mod tests {
         // test all known market names
         let known_names = vec!["sgx", "smse", "tase", "zse"];
         for market_name in known_names {
-            let market = MarketFactory::gen_market(market_name);
+            let market = gen_market(market_name);
             assert!(
                 market.is_some(),
                 "There must be a market generated for name '{}'",

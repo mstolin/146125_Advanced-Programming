@@ -6,15 +6,27 @@ use std::io::Write;
 
 #[derive(Debug,Deserialize,Serialize)]
 pub(crate) struct Balance{
-    id :f64,
-    possession : f64
+    pub day:f64,
+    pub eur:f64,
+    pub usd:f64,
+    pub yen:f64,
+    pub yuan:f64,
 }
 impl Balance{
-    pub(crate) fn get_id(&self) -> f64{
-        self.id
+    pub(crate) fn get_day(&self) -> f64{
+        self.day
     }
-    pub(crate) fn get_possession(&self) -> f64{
-        self.possession
+    pub(crate) fn get_eur(&self) -> f64{
+        self.eur
+    }
+    pub(crate) fn get_usd(&self) -> f64{
+        self.usd
+    }
+    pub(crate) fn get_yen(&self) -> f64{
+        self.yen
+    }
+    pub(crate) fn get_yuan(&self) -> f64{
+        self.yuan
     }
 }
 
@@ -23,15 +35,22 @@ impl Balance{
 /// Serializes the activities in a location, with the desired name;
 /// to be able to work for the visualizer it needs a log (vector) of activities in the form of a vector as indicated
 ///
-pub fn save(activities : &[(i32,f64)],filename : &str){
-    let balances: Vec<Balance>= activities.iter()
-        .map(|op| Balance{id : op.0 as f64,possession : op.1})
-        .collect();
+pub fn save(activities : &Vec<(i32,f64,f64,f64,f64)>,filename : &str){
+    let balances = activities.into_iter()
+        .map(|op| Balance{
+            day : op.0 as f64,
+            eur : op.1,
+            usd: op.2,
+            yen : op.3,
+            yuan : op.4
+        })
+        .collect::<Vec<Balance>>();
 
     let json_ops = serde_json::to_string(&balances).unwrap();
-
-    //need to change filepath after merge to main
-    let mut file = File::create(format!("visualizer/src/trades/{filename}.json")).expect("Could not save");
+    println!("attempting to create json file");
+    //path is wrong? Test can read but now write
+    let mut file = File::create(format!("src/trades/{}.json",filename)).expect("Could not save");
+    println!("json was created");
     file.write_all(json_ops.as_bytes()).unwrap();
 }
 
