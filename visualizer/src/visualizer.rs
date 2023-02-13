@@ -1,6 +1,6 @@
 use std::error::Error;
-use druid::{AppLauncher, Widget, WindowDesc};
-use druid::widget::{Flex, Label, SizedBox};
+use druid::{AppLauncher, Widget, WidgetExt, WindowDesc};
+use druid::widget::{Flex, Label, Padding, Scroll, SizedBox};
 use plotters::prelude::*;
 use plotters::prelude::full_palette::{CYAN_900};
 use plotters::style::full_palette::{GREEN_600, INDIGO_100, LIGHTBLUE_600, PURPLE_600, RED_500};
@@ -50,7 +50,7 @@ fn load_strategies() -> Vec<Strategy>{
 }
 
 pub fn render_plot()-> Result<(),Box<dyn Error>>{
-    let main_window = WindowDesc::new(chart_builder)
+    let main_window = WindowDesc::new(layout_builder)
         .title("Strategy result")
         .window_size((1600.0, 900.0))
         .resizable(true);
@@ -61,9 +61,12 @@ pub fn render_plot()-> Result<(),Box<dyn Error>>{
     Ok(())
 }
 
-fn chart_builder() -> impl Widget<()>{
+fn layout_builder() -> impl Widget<()>{
     let trades = load_strategies();
     let selected = 0;
+
+    let tldr1 = tldr(&trades,selected);
+
     let mut layout = Flex::column();
     layout.add_spacer(50.0);
     let mut row = Flex::row()
@@ -188,10 +191,14 @@ fn chart_builder() -> impl Widget<()>{
             )).unwrap();
 
 
-        })).width(600.0).height(500.0));
+        }))
+            .width(600.0)
+            .height(500.0));
 
     let trades = load_strategies(); //recreated because of move from the previous plot
-    let selected = 1;
+    let selected = 5;
+    let tldr2 = tldr(&trades,selected);
+
     row.add_spacer(10.0);
     row.add_child(SizedBox::new(Plot::new(move |_size, _data, root| {
 
@@ -314,13 +321,14 @@ fn chart_builder() -> impl Widget<()>{
         )).unwrap();
 
 
-    })).width(600.0).height(500.0));
+    }))
+        .width(600.0)
+        .height(500.0));
+
     layout.add_child(row);
     layout.add_child(info_panel());
+    layout.add_child(info_execution(&tldr1,&tldr2));
     return layout;
-
-
-
 
 }
 
@@ -331,4 +339,28 @@ fn info_panel() -> impl Widget<()> {
     column.add_child(Label::new("Blue : Japanese Yen"));
     column.add_child(Label::new("Purple : Chinese Yuan"));
     column
+}
+
+fn tldr(trades :&Vec<Strategy>,selected : usize) -> Vec<String>{
+    let tldr = trades[selected].transaction_summary.iter()
+        .zip(&trades[selected].balance)
+        .map(|((day,_),(eur,usd,yen,yuan))| format!("Day {}: {} eur, {} usd, {} yen, {} yuan",day,eur,usd,yen,yuan))
+        .collect::<Vec<String>>();
+    tldr
+}
+
+fn info_execution(text1 : &Vec<String>,text2 : &Vec<String>) -> impl Widget<()>{
+    let mut text_from_1 : String = "".to_string();
+    for i in 0..text1.len(){
+        text_from_1.push_str(&*format!("{}\n", text1[i]).to_string());
+    }
+    let mut text_from_2 : String = "".to_string();
+    for i in 0..text2.len(){
+        text_from_2.push_str(&*format!("{}\n", text2[i]).to_string());
+    }
+    Flex::row()
+        .with_child(Scroll::new(Label::new(text_from_1)))
+        .with_spacer(30.0)
+        .with_child(Scroll::new(Label::new(text_from_2)))
+
 }
