@@ -1,6 +1,6 @@
-use std::borrow::{Borrow, BorrowMut};
+use std::borrow::Borrow;
 use log::{info, warn};
-use std::cell::{Ref, RefCell};
+use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::rc::Rc;
 use crate::strategies::strategy::Strategy;
@@ -16,16 +16,13 @@ struct ExchangeRate {
     ex_rate: f32,
     /// the good kind
     good_kind: GoodKind,
-    // /// the market that has this exchange rate
-    // market_name: String,
 }
 
 impl ExchangeRate {
-    fn new(ex_rate: f32, good_kind: GoodKind, market_name: String) -> ExchangeRate {
+    fn new(ex_rate: f32, good_kind: GoodKind) -> ExchangeRate {
         ExchangeRate {
             ex_rate,
             good_kind,
-            // market_name,
         }
     }
 }
@@ -68,7 +65,6 @@ pub struct StingyStrategy {
     markets: Vec<MarketRef>,
     /// Price history of the exchange rate for buying goods from the markets
     /// It is a `VecDeque` in order to push back the new data and pop front the old data.
-    //ex_rate_history: RefCell<Vec<ExchangeRate>>,
     ex_rate_buy_history: RefCell<VecDeque<ExchangeRate>>,
     /// Price history of the exchange rate for selling goods to the markets
     /// It is a `VecDeque` in order to push back the new data and pop front the old data.
@@ -96,7 +92,7 @@ impl StingyStrategy {
             for good in goods {
 
                 if good.good_kind != GoodKind::EUR {
-                    let quantity = balance * percentage * good.exchange_rate_buy;
+                    let quantity = balance * percentage * good.exchange_rate_buy; /// TODO: check this
                     let buy_price = market
                         .as_ref()
                         .borrow()
@@ -120,9 +116,9 @@ impl StingyStrategy {
                                 market_name: market_name.clone()
                             });
                         }
-                    } else {
-                        warn!("Could not find a possible deal");
-                    }
+                    } // else {
+                    //     warn!("Could not find a possible deal");
+                    // }
                 }
             }
         }
@@ -159,7 +155,7 @@ impl StingyStrategy {
         }
 
         if best_deal.is_some() {
-            info!("Found the best deal!");
+            info!("Found the best deal: {:?}", &best_deal);
         } else {
             warn!("Could not find the best deal");
         }
@@ -186,7 +182,7 @@ impl StingyStrategy {
                 info!("Lock buy done with token: {}", token.clone());
                 return Some(token);
             } else {
-                warn!("Not able to lock buy");
+                warn!("Not able to lock buy: {:?}", token);
             }
         }
 
@@ -324,7 +320,7 @@ impl StingyStrategy {
         }
 
         if best_deal.is_some() {
-            info!("Found the best deal!");
+            info!("Found the best deal! {:?}", &best_deal);
         } else {
             warn!("Could not find the best deal");
         }
@@ -369,7 +365,7 @@ impl StingyStrategy {
         let deal = self.filter_deals_for_sell(deals);
 
         if let Some(deal) = deal {
-            let token = self.lock_deal(&deal);
+            let token = self.lock_deal_for_sell(&deal);
 
             let market = self
                 .markets
@@ -452,7 +448,6 @@ impl StingyStrategy {
                     ex_rates.push(ExchangeRate::new(
                         good.exchange_rate_buy,
                         good.good_kind,
-                        market.as_ref().borrow().get_name().to_string()
                     ));
                 }
             }
@@ -517,7 +512,6 @@ impl StingyStrategy {
                     ex_rates.push(ExchangeRate::new(
                         good.exchange_rate_sell,
                         good.good_kind,
-                        market.as_ref().borrow().get_name().to_string()
                     ));
                 }
             }
@@ -608,8 +602,6 @@ impl Strategy for StingyStrategy {
 #[cfg(test)]
 mod tests {
     use std::rc::Rc;
-    use env_logger::init;
-    use log::info;
     use crate::consts::TRADER_NAME_STINGY;
     use crate::MarketRef;
     use SGX::market::sgx::SGX;
@@ -710,7 +702,7 @@ mod tests {
             Rc::clone(&tase),
             Rc::clone(&zse)
         ];
-        let mut strategy = StingyStrategy::new(markets, trader_name);
+        let strategy = StingyStrategy::new(markets, trader_name);
 
         strategy.update_ex_rates_buy();
         let deals = strategy.find_deals(100_000.0, 0.05);
@@ -723,7 +715,7 @@ mod tests {
         let trader_name = TRADER_NAME_STINGY;
         let zse = init_zse(0.0, 100_000.0, 0.0, 0.0);
         let markets = vec![ Rc::clone(&zse) ];
-        let mut strategy = StingyStrategy::new(markets, trader_name);
+        let strategy = StingyStrategy::new(markets, trader_name);
 
         strategy.update_ex_rates_buy();
         let deals = strategy.find_deals(100_000.0, 0.05);
