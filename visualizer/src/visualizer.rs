@@ -331,7 +331,7 @@ fn layout_builder() -> impl Widget<()>{
     layout.add_child(info_panel());
     layout.add_child(info_execution(&tldr1,&tldr2));
 
-    let scroll = Scroll::new(Padding::new(40.0,layout));
+    let scroll = Scroll::new(Padding::new(35.0,layout));
     return scroll;
 
 
@@ -339,10 +339,13 @@ fn layout_builder() -> impl Widget<()>{
 
 fn info_panel() -> impl Widget<()> {
     let mut column = Flex::column();
+
     column.add_child(Label::new("Green : Euro"));
     column.add_child(Label::new("Red : US Dollar"));
     column.add_child(Label::new("Blue : Japanese Yen"));
     column.add_child(Label::new("Purple : Chinese Yuan"));
+    column.add_spacer(30.0);
+
     column
 }
 
@@ -365,7 +368,7 @@ fn info_execution(text1 : &Vec<String>,text2 : &Vec<String>) -> impl Widget<()>{
     }
     Flex::row()
         .with_child(Scroll::new(Label::new(text_from_1)))
-        .with_spacer(30.0)
+        .with_spacer(80.0)
         .with_child(Scroll::new(Label::new(text_from_2)))
 
 }
