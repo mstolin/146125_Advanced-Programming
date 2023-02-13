@@ -149,7 +149,7 @@ impl StingyStrategy {
 
         let deals_to_iter;
 
-        if filtered_deals.is_empty() {
+        if !filtered_deals.is_empty() {
             deals_to_iter = &filtered_deals;
         } else {
             deals_to_iter = &deals;
@@ -326,7 +326,7 @@ impl StingyStrategy {
 
         let deals_to_iter;
 
-        if filtered_deals.is_empty() {
+        if !filtered_deals.is_empty() {
             deals_to_iter = &filtered_deals;
         } else {
             deals_to_iter = &deals;
