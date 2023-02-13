@@ -2,7 +2,7 @@
 name = "trader-cli"
 version = "0.1.0"
 edition = "2021"
-authors = ["Farid Ouedraogo, Marcel Stolin, Sebastiano Cassol, Jacopo Clocchiatti"]
+authors = ["Marcel Stolin"]
 
 [dependencies]
 chrono = "0.4.23"
@@ -15,4 +15,3 @@ TASE = { version = "0.1.2", registry = "kellnr" }
 trader = { path = "../trader" }
 unitn_market_2022 = { version = "1.0.10", registry = "kellnr" }
 ZSE = { version = "0.1.3", registry = "kellnr" }
-#visualizer = { path = "../visualizer" }
