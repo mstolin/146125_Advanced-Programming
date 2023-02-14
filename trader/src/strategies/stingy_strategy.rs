@@ -160,7 +160,7 @@ impl StingyStrategy {
 
         for deal in deals_to_iter.iter() {
             if let Some(best_deal) = &mut best_deal {
-                if deal.get_ex_rate() < best_deal.get_ex_rate() {
+                if deal.get_price() < best_deal.get_price() {
                     *best_deal = deal.clone()
                 }
             } else {
@@ -337,7 +337,7 @@ impl StingyStrategy {
 
         for deal in deals_to_iter.iter() {
             if let Some(best_deal) = &mut best_deal {
-                if deal.get_ex_rate() > best_deal.get_ex_rate() {
+                if deal.get_price() > best_deal.get_price() {
                     *best_deal = deal.clone();
                 }
             } else {
