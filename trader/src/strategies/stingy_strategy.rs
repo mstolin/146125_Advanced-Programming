@@ -8,10 +8,11 @@ use std::rc::Rc;
 use unitn_market_2022::good::good::Good;
 use unitn_market_2022::good::good_kind::GoodKind;
 
-/// This const define the percentage that the trader is willing to buy or sell.
+/// This consts define the percentage that the trader is willing to buy or sell.
 /// In order to be coherent with the strategy, it has not to be greater than 0.05.
 const PERCENTAGE_BUY: f32 = 0.01;
 const PERCENTAGE_SELL: f32 = 0.01;
+/// This const define the percentage that the trader is willing to sell while closing the strategy.
 const PERCENTAGE_SELL_ALL_GOODS: f32 = 1.0;
 
 /// An `ExchangeRate` is struct that holds the exchange rate of a certain market in a certain moment, for a certain good
@@ -613,17 +614,14 @@ impl Strategy for StingyStrategy {
         for _ in 0..3 {
             self.sell_deal(goods, PERCENTAGE_SELL_ALL_GOODS);
         }
-        self.display_goods(goods);
     }
 
     /// This method defines how to apply the strategy.
     fn apply(&self, goods: &mut Vec<Good>) {
-        self.display_goods(goods);
         self.buy_deal(goods, PERCENTAGE_BUY);
         self.update_ex_rates_buy();
         self.sell_deal(goods, PERCENTAGE_SELL);
         self.update_ex_rates_sell();
-        self.display_goods(goods);
     }
 }
 
