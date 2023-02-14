@@ -4,9 +4,9 @@ version = 3
 
 [[package]]
 name = "SGX"
-version = "0.1.5"
+version = "0.1.6"
 source = "registry+git://advancedprogramming.disi.unitn.it/index"
-checksum = "704171b5681e55e948e94187e57150a85f68ab705bb709a7c2ac0ace2bdfb350"
+checksum = "cec75bb839c0e70479dafaba4a42a8665a7db03993ab60cd1ed760dd8dfbe478"
 dependencies = [
  "chrono",
  "rand",

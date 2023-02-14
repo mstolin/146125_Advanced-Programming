@@ -10,9 +10,9 @@ use unitn_market_2022::good::good_kind::GoodKind;
 
 /// This const define the percentage that the trader is willing to buy or sell.
 /// In order to be coherent with the strategy, it has not to be greater than 0.05.
-pub const PERCENTAGE_BUY: f32 = 0.01;
-pub const PERCENTAGE_SELL: f32 = 0.01;
-pub const PERCENTAGE_SELL_ALL_GOODS: f32 = 1.0;
+const PERCENTAGE_BUY: f32 = 0.01;
+const PERCENTAGE_SELL: f32 = 0.01;
+const PERCENTAGE_SELL_ALL_GOODS: f32 = 1.0;
 
 /// An `ExchangeRate` is struct that holds the exchange rate of a certain market in a certain moment, for a certain good
 /// It will be added to a `VecDeque<ExchangeRate>` to keep trace of the markets exchange rate history
@@ -57,7 +57,10 @@ impl Deal {
         }
     }
 
-    /// Return the exchange rate of the deal
+    /// Return as `f32` the price of the deal
+    fn get_price(&self) -> f32 { self.price }
+
+    /// Return as `f32` the exchange rate of the deal
     fn get_ex_rate(&self) -> f32 {
         self.price / self.quantity
     }
@@ -320,7 +323,7 @@ impl StingyStrategy {
 
         let filtered_deals = deals
             .iter()
-            .filter(|deal| deal.get_ex_rate() > self.get_avg_sell_ex_rate(deal.good_kind))
+            .filter(|deal| deal.get_ex_rate() >= self.get_avg_sell_ex_rate(deal.good_kind))
             .cloned()
             .collect::<Vec<Deal>>();
 
