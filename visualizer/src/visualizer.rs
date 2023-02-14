@@ -1,9 +1,8 @@
 use std::error::Error;
-use druid::{AppLauncher, Widget, WindowDesc};
+use druid::{AppLauncher, Widget, WidgetExt, WindowDesc};
 use druid::widget::{Flex, Label, Padding, Scroll, SizedBox};
 use plotters::prelude::*;
-use plotters::prelude::full_palette::{CYAN_900};
-use plotters::style::full_palette::{GREEN_600, INDIGO_100, LIGHTBLUE_600, PURPLE_600, RED_500};
+use plotters::style::full_palette::{GREEN_600, INDIGO_100, LIGHTBLUE_600, PURPLE_600, RED_500, RED_600};
 use plotters_druid::Plot;
 
 use super::strategy_reader;
@@ -70,6 +69,7 @@ fn layout_builder() -> impl Widget<()>{
     let tldr1 = tldr(&trades,selected);
 
     let mut layout = Flex::column();
+
     layout.add_spacer(50.0);
     let mut row = Flex::row()
         .with_child(SizedBox::new(Plot::new(move |_size, _data, root| {
@@ -150,8 +150,8 @@ fn layout_builder() -> impl Widget<()>{
             //to have a labelled point on every value update on the plot
             chart_context.draw_series(PointSeries::of_element(
                 observed_eur.clone(),
-                3,
-                &CYAN_900,
+                2,
+                &GREEN_600,
                 &|c, s, st| {
                     EmptyElement::at(c)    // Composed element on-the-fly
                         + Circle::new((0,0),s,st.filled()) // New pixel coordinate is established in c, with a filled circle on the point
@@ -161,8 +161,8 @@ fn layout_builder() -> impl Widget<()>{
 
             chart_context.draw_series(PointSeries::of_element(
                 observed_usd.clone(),
-                3,
-                &CYAN_900,
+                2,
+                &RED_600,
                 &|c, s, st| {
                     EmptyElement::at(c)    // Composed element on-the-fly
                         + Circle::new((0,0),s,st.filled()) // New pixel coordinate is established in c, with a filled circle on the point
@@ -172,8 +172,8 @@ fn layout_builder() -> impl Widget<()>{
 
             chart_context.draw_series(PointSeries::of_element(
                 observed_yen.clone(),
-                3,
-                &CYAN_900,
+                2,
+                &LIGHTBLUE_600,
                 &|c, s, st| {
                     EmptyElement::at(c)    // Composed element on-the-fly
                         + Circle::new((0,0),s,st.filled()) // New pixel coordinate is established in c, with a filled circle on the point
@@ -183,12 +183,11 @@ fn layout_builder() -> impl Widget<()>{
 
             chart_context.draw_series(PointSeries::of_element(
                 observed_yuan.clone(),
-                3,
-                &CYAN_900,
+                2,
+                &PURPLE_600,
                 &|c, s, st| {
                     EmptyElement::at(c)    // Composed element on-the-fly
                         + Circle::new((0,0),s,st.filled()) // New pixel coordinate is established in c, with a filled circle on the point
-                        + Text::new(format!("€ {:.2}", c.1), (-2,-30), ("sans-serif", 14).into_font()) //Every point will have its total value labelled
                 },
             )).unwrap();
 
@@ -198,7 +197,7 @@ fn layout_builder() -> impl Widget<()>{
             .height(500.0));
 
     let trades = load_strategies(); //recreated because of move from the previous plot
-    let selected = 5%trades.len();
+    let selected = 1%trades.len();
     let tldr2 = tldr(&trades,selected);
 
     row.add_spacer(10.0);
@@ -264,7 +263,7 @@ fn layout_builder() -> impl Widget<()>{
             observed_usd.clone(),
             0.0,
             INDIGO_100.mix(0.33),
-        ).border_style(RED_500)).unwrap();
+        ).border_style(RED_600)).unwrap();
         chart_context.draw_series(AreaSeries::new(
             observed_yen.clone(),
             0.0,
@@ -280,8 +279,8 @@ fn layout_builder() -> impl Widget<()>{
         //to have a labelled point on every value update on the plot
         chart_context.draw_series(PointSeries::of_element(
             observed_eur.clone(),
-            3,
-            &CYAN_900,
+            2,
+            &GREEN_600,
             &|c, s, st| {
                 EmptyElement::at(c)    // Composed element on-the-fly
                     + Circle::new((0,0),s,st.filled()) // New pixel coordinate is established in c, with a filled circle on the point
@@ -291,8 +290,8 @@ fn layout_builder() -> impl Widget<()>{
 
         chart_context.draw_series(PointSeries::of_element(
             observed_usd.clone(),
-            3,
-            &CYAN_900,
+            2,
+            &RED_600,
             &|c, s, st| {
                 EmptyElement::at(c)    // Composed element on-the-fly
                     + Circle::new((0,0),s,st.filled()) // New pixel coordinate is established in c, with a filled circle on the point
@@ -302,8 +301,8 @@ fn layout_builder() -> impl Widget<()>{
 
         chart_context.draw_series(PointSeries::of_element(
             observed_yen.clone(),
-            3,
-            &CYAN_900,
+            2,
+            &LIGHTBLUE_600,
             &|c, s, st| {
                 EmptyElement::at(c)    // Composed element on-the-fly
                     + Circle::new((0,0),s,st.filled()) // New pixel coordinate is established in c, with a filled circle on the point
@@ -313,12 +312,11 @@ fn layout_builder() -> impl Widget<()>{
 
         chart_context.draw_series(PointSeries::of_element(
             observed_yuan.clone(),
-            3,
-            &CYAN_900,
+            2,
+            &PURPLE_600,
             &|c, s, st| {
                 EmptyElement::at(c)    // Composed element on-the-fly
                     + Circle::new((0,0),s,st.filled()) // New pixel coordinate is established in c, with a filled circle on the point
-                    + Text::new(format!("€ {:.2}", c.1), (-2,-30), ("sans-serif", 14).into_font()) //Every point will have its total value labelled
             },
         )).unwrap();
 
@@ -329,7 +327,7 @@ fn layout_builder() -> impl Widget<()>{
 
     layout.add_child(row);
     layout.add_child(info_panel());
-    layout.add_child(info_execution(&tldr1,&tldr2));
+    layout.add_child(info_execution(&tldr1,&tldr2).center());
 
     let scroll = Scroll::new(Padding::new(35.0,layout));
     return scroll;
@@ -352,7 +350,8 @@ fn info_panel() -> impl Widget<()> {
 fn tldr(trades :&Vec<Strategy>,selected : usize) -> Vec<String>{
     let tldr = trades[selected].transaction_summary.iter()
         .zip(&trades[selected].balance)
-        .map(|((day,_),(eur,usd,yen,yuan))| format!("Day {}: {} eur, {} usd, {} yen, {} yuan",day,eur,usd,yen,yuan))
+        .map(|((day,_),(eur,usd,yen,yuan))|
+            format!("Day {day}:  \n eur {eur:.2},  usd {usd:.2},  yen {yen:.2},  yuan {yuan:.2}"))
         .collect::<Vec<String>>();
     tldr
 }
@@ -370,5 +369,6 @@ fn info_execution(text1 : &Vec<String>,text2 : &Vec<String>) -> impl Widget<()>{
         .with_child(Scroll::new(Label::new(text_from_1)))
         .with_spacer(80.0)
         .with_child(Scroll::new(Label::new(text_from_2)))
+        .center()
 
 }
