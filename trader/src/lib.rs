@@ -27,9 +27,10 @@
 //!
 //! # Available Stratagies
 //!
-//! | Class                                   | Identifier                                    | Author        |
-//! |-----------------------------------------|-----------------------------------------------|---------------|
-//! | [`strategies::average_seller_strategy`] | [`trader::StrategyIdentifier::AverageSeller`] | Marcel Stolin |
+//! | Class                                   | Identifier                                    | Author             |
+//! |-----------------------------------------|------------------------------------------------|-------------------|
+//! | [`strategies::average_seller_strategy`] | [`trader::StrategyIdentifier::AverageSeller`]  | Marcel Stolin     |
+//! | [`strategies::stingy_strategy`]         | [`trader::StrategyIdentifier::StingyStrategy`] | Cassol Sebastiano |
 //!
 //! ## How to create a new strategy
 //!

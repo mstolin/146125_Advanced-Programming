@@ -10,9 +10,9 @@ use unitn_market_2022::good::good_kind::GoodKind;
 
 /// This const define the percentage that the trader is willing to buy or sell.
 /// In order to be coherent with the strategy, it has not to be greater than 0.05.
-pub const PERCENTAGE_BUY: f32 = 0.01;
-pub const PERCENTAGE_SELL: f32 = 0.01;
-pub const PERCENTAGE_SELL_ALL_GOODS: f32 = 1.0;
+const PERCENTAGE_BUY: f32 = 0.01;
+const PERCENTAGE_SELL: f32 = 0.01;
+const PERCENTAGE_SELL_ALL_GOODS: f32 = 1.0;
 
 /// An `ExchangeRate` is struct that holds the exchange rate of a certain market in a certain moment, for a certain good
 /// It will be added to a `VecDeque<ExchangeRate>` to keep trace of the markets exchange rate history
@@ -57,7 +57,10 @@ impl Deal {
         }
     }
 
-    /// Return the exchange rate of the deal
+    /// Return as `f32` the price of the deal
+    fn get_price(&self) -> f32 { self.price }
+
+    /// Return as `f32` the exchange rate of the deal
     fn get_ex_rate(&self) -> f32 {
         self.price / self.quantity
     }
@@ -102,7 +105,7 @@ impl StingyStrategy {
             for good in goods {
                 if good.good_kind != GoodKind::EUR {
                     let quantity = balance * percentage * good.exchange_rate_buy;
-                    /// TODO: check this
+
                     let buy_price = market
                         .as_ref()
                         .borrow()
@@ -120,18 +123,18 @@ impl StingyStrategy {
                                 buy_price,
                                 market_name.clone()
                             );
-                            deals.push(Deal {
-                                price: buy_price,
+                            deals.push(Deal::new(
+                                buy_price,
                                 quantity,
-                                good_kind: good.good_kind,
-                                market_name: market_name.clone(),
-                            });
+                                good.good_kind,
+                                market_name.clone()
+                            ));
                         }
                     }
                 }
             }
         }
-        return deals;
+        deals
     }
 
     /// Return an optional `Deal` that represent the best deal contained in the `Vec<Deal>`.
@@ -149,14 +152,15 @@ impl StingyStrategy {
 
         let deals_to_iter;
 
-        if filtered_deals.len() > 0 {
+        if !filtered_deals.is_empty() {
             deals_to_iter = &filtered_deals;
         } else {
             deals_to_iter = &deals;
-        }
+        };
+
         for deal in deals_to_iter.iter() {
             if let Some(best_deal) = &mut best_deal {
-                if deal.get_ex_rate() < best_deal.get_ex_rate() {
+                if deal.get_price() < best_deal.get_price() {
                     *best_deal = deal.clone()
                 }
             } else {
@@ -178,7 +182,7 @@ impl StingyStrategy {
         let market = self
             .markets
             .iter()
-            .find(|m| m.as_ref().borrow().get_name().to_string() == deal.market_name);
+            .find(|m| *m.as_ref().borrow().get_name().to_string() == deal.market_name);
 
         if let Some(market) = market {
             let mut market = market.as_ref().borrow_mut();
@@ -191,7 +195,7 @@ impl StingyStrategy {
             );
 
             if let Ok(token) = token {
-                info!("Lock buy done with token: {}", token.clone());
+                info!("Lock buy done with token: {}", token);
                 return Some(token);
             } else {
                 warn!("Not able to lock buy: {:?}", token);
@@ -225,12 +229,12 @@ impl StingyStrategy {
             let market = self
                 .markets
                 .iter()
-                .find(|market| market.as_ref().borrow().get_name().to_string() == deal.market_name)
+                .find(|market| *market.as_ref().borrow().get_name().to_string() == deal.market_name)
                 .unwrap();
             let mut market = market.as_ref().borrow_mut();
 
             if let Some(token) = token {
-                let buy_good = market.buy(token.clone(), trader_eur);
+                let buy_good = market.buy(token, trader_eur);
 
                 if let Ok(buy_good) = buy_good {
                     info!(
@@ -295,12 +299,12 @@ impl StingyStrategy {
                                     sell_price,
                                     market_name.clone()
                                 );
-                                deals.push(Deal {
-                                    price: sell_price,
+                                deals.push(Deal::new(
+                                    sell_price,
                                     quantity,
-                                    good_kind: good.get_kind(),
-                                    market_name: market_name.clone(),
-                                });
+                                    good.get_kind(),
+                                    market_name.clone()
+                                ));
                             }
                         }
                     }
@@ -319,13 +323,13 @@ impl StingyStrategy {
 
         let filtered_deals = deals
             .iter()
-            .filter(|deal| deal.get_ex_rate() > self.get_avg_sell_ex_rate(deal.good_kind))
+            .filter(|deal| deal.get_ex_rate() >= self.get_avg_sell_ex_rate(deal.good_kind))
             .cloned()
             .collect::<Vec<Deal>>();
 
         let deals_to_iter;
 
-        if filtered_deals.len() > 0 {
+        if !filtered_deals.is_empty() {
             deals_to_iter = &filtered_deals;
         } else {
             deals_to_iter = &deals;
@@ -333,7 +337,7 @@ impl StingyStrategy {
 
         for deal in deals_to_iter.iter() {
             if let Some(best_deal) = &mut best_deal {
-                if deal.get_ex_rate() > best_deal.get_ex_rate() {
+                if deal.get_price() > best_deal.get_price() {
                     *best_deal = deal.clone();
                 }
             } else {
@@ -399,7 +403,7 @@ impl StingyStrategy {
             let market = self
                 .markets
                 .iter()
-                .find(|market| market.as_ref().borrow().get_name().to_string() == deal.market_name)
+                .find(|market| *market.as_ref().borrow().get_name().to_string() == deal.market_name)
                 .unwrap();
             let mut market = market.as_ref().borrow_mut();
 
@@ -409,7 +413,7 @@ impl StingyStrategy {
                     .find(|good| good.get_kind() == deal.good_kind)
                     .unwrap();
 
-                let sell_good = market.sell(token.clone(), good_to_sell);
+                let sell_good = market.sell(token, good_to_sell);
 
                 if let Ok(sell_good) = sell_good {
                     info!(
@@ -441,7 +445,7 @@ impl StingyStrategy {
 impl StingyStrategy {
     /// Get the quantity of the markets involved in this strategy.
     fn get_market_qty(&self) -> usize {
-        return self.markets.len();
+        self.markets.len()
     }
 
     /// It is a method for debugging purposes.
@@ -480,7 +484,7 @@ impl StingyStrategy {
                 }
             }
         }
-        return ex_rates;
+        ex_rates
     }
 
     /// Update the [`ex_rate_buy_history`] with the actual exchange rate of the good.
@@ -508,7 +512,7 @@ impl StingyStrategy {
             }
         }
 
-        return total / counter as f32;
+        total / counter as f32
     }
 
     /// This methods adds a `deal` to the buy history.
@@ -545,7 +549,7 @@ impl StingyStrategy {
                 }
             }
         }
-        return ex_rates;
+        ex_rates
     }
 
     /// Update the [`ex_rate_sell_history`] with the actual exchange rate of the good.
@@ -573,26 +577,13 @@ impl StingyStrategy {
             }
         }
 
-        return total / counter as f32;
+        total / counter as f32
     }
 
     /// This methods adds a `deal` to the sell history.
     fn update_sell_history(&self, deal: Deal) {
         let mut deal_sell_history = self.deals_sell_history.borrow_mut();
         deal_sell_history.push(deal);
-    }
-}
-
-/// Helper methods
-impl StingyStrategy {
-    fn find_deal_by_good(&self, deals: &Vec<Deal>, goodkind: GoodKind) -> Vec<Deal> {
-        let deals_some_good = deals
-            .iter()
-            .filter(|deal| deal.good_kind == goodkind)
-            .cloned()
-            .collect::<Vec<Deal>>();
-
-        deals_some_good
     }
 }
 
@@ -639,7 +630,7 @@ impl Strategy for StingyStrategy {
 #[cfg(test)]
 mod tests {
     use crate::consts::TRADER_NAME_STINGY;
-    use crate::strategies::stingy_strategy::{Deal, StingyStrategy};
+    use crate::strategies::stingy_strategy::{Deal, ExchangeRate, StingyStrategy};
     use crate::strategies::strategy::Strategy;
     use crate::MarketRef;
     use smse::Smse;
@@ -671,121 +662,113 @@ mod tests {
         zse
     }
 
-    fn init_markets(
-        eur: f32,
-        usd: f32,
-        yen: f32,
-        yuan: f32,
-    ) -> (MarketRef, MarketRef, MarketRef, MarketRef) {
-        let sgx = SGX::new_with_quantities(eur, yen, usd, yuan);
-        let smse = Smse::new_with_quantities(eur, yen, usd, yuan);
-        let tase = TASE::new_with_quantities(eur, yen, usd, yuan);
-        let zse = ZSE::new_with_quantities(eur, yen, usd, yuan);
-        (sgx, smse, tase, zse)
-    }
-
-    #[test]
-    fn test_find_deals_no_deals() {
-        let trader_name = TRADER_NAME_STINGY;
-        let smse = init_smse(0.0, 100.0, 100.0, 0.0);
-        let tase = init_tase(0.0, 100.0, 100.0, 0.0);
-        let markets = vec![Rc::clone(&smse), Rc::clone(&tase)];
-        let strategy = StingyStrategy::new(markets, trader_name);
-
-        let deals = strategy.find_deals(100_000.0, 0.05);
-        assert_eq!(deals.len(), 0);
-    }
-
     #[test]
     fn test_find_deals() {
         let trader_name = TRADER_NAME_STINGY;
-        let smse = init_smse(0.0, 100_000.0, 0.0, 0.0);
-        let tase = init_tase(0.0, 100_000.0, 0.0, 0.0);
-        let markets = vec![Rc::clone(&smse), Rc::clone(&tase)];
-        let strategy = StingyStrategy::new(markets, trader_name);
 
-        let deal = strategy.find_deals(100_000.0, 0.05);
-        assert!(deal.len() > 0, "There should be one deal");
-    }
+        let sgx = init_sgx(0.0, 100_000.0, 0.0, 0.0);
+        let smse = init_smse(0.0, 0.0, 100.0, 1_000.0);
+        let tase = init_tase(0.0, 10000.0, 10000.0, 0.0);
+        let zse = init_zse(0.0, 10.0, 100.0, 0.0);
 
-    #[test]
-    fn test_filter_deals() {
-        let trader_name = TRADER_NAME_STINGY;
-        let (sgx, smse, tase, zse) = init_markets(0.0, 100_000.0, 0.0, 0.0);
-        let markets = vec![
+        let _markets = vec![
             Rc::clone(&sgx),
             Rc::clone(&smse),
             Rc::clone(&tase),
             Rc::clone(&zse),
         ];
-        let strategy = StingyStrategy::new(markets, trader_name);
 
-        strategy.update_ex_rates_buy();
+        // test find deals with no market
+        let strategy = StingyStrategy::new(vec![], trader_name);
+        let deals = strategy.find_deals(1_000.0, 0.01);
+        assert!(deals.is_empty(), "The strategy should not find a deal");
+
+        // test find deals with one market
+        let strategy = StingyStrategy::new(vec![Rc::clone(&tase)], trader_name);
+        let deals = strategy.find_deals(1_000.0, 0.01);
+        assert!(!deals.is_empty(), "The strategy should find at least one deal");
+
+        // test find deals with no deals
+        let smse = init_smse(0.0, 100.0, 100.0, 0.0);
+        let tase = init_tase(0.0, 100.0, 100.0, 0.0);
+        let markets = vec![Rc::clone(&smse), Rc::clone(&tase)];
+
+        let strategy = StingyStrategy::new(markets, trader_name);
         let deals = strategy.find_deals(100_000.0, 0.05);
-        let deal = strategy.filter_deals(deals);
-        assert!(deal.is_some(), "There should be a deal");
+        assert!(deals.is_empty(), "The strategy should not find a deal");
+
+        // test find deals with more than one market
+        let _sgx = init_sgx(0.0, 0.0, 100_000.0, 0.0);
+        let smse = init_smse(0.0, 10.0, 0.0, 0.0);
+        let tase = init_tase(0.0, 0.0, 10000.0, 10_000.0);
+        let zse = init_zse(0.0, 0.0, 100_000.0, 10.0);
+
+        let strategy = StingyStrategy::new(vec![
+            Rc::clone(&tase),
+            Rc::clone(&smse),
+            Rc::clone(&tase),
+            Rc::clone(&zse)], trader_name);
+
+        let deals = strategy.find_deals(1_000.0, 0.01);
+        assert!(!deals.is_empty(), "The strategy should find at least one deal");
     }
 
     #[test]
-    fn test_filter_deals_one_market() {
+    fn test_filter_deals() {
         let trader_name = TRADER_NAME_STINGY;
+
+        // test filter deals with more than one market
         let zse = init_zse(0.0, 100_000.0, 0.0, 0.0);
-        let markets = vec![Rc::clone(&zse)];
+        let smse = init_smse(0.0, 100_000.0, 0.0, 100.0);
+        let markets = vec![Rc::clone(&zse), Rc::clone(&smse)];
         let strategy = StingyStrategy::new(markets, trader_name);
 
-        strategy.update_ex_rates_buy();
         let deals = strategy.find_deals(100_000.0, 0.05);
         let deal = strategy.filter_deals(deals);
-        assert!(deal.is_some(), "There should be a deal");
-    }
+        assert!(deal.is_some(), "There should be a good deal");
 
-    #[test]
-    fn test_filter_deals_with_known_deals() {
-        let trader_name = TRADER_NAME_STINGY;
+        // test filter deals with one market
+        let strategy = StingyStrategy::new(vec![Rc::clone(&zse)], trader_name);
+        let deals = strategy.find_deals(100_000.0, 0.01);
+        let deal = strategy.filter_deals(deals);
+        assert!(deal.is_some(), "The strategy should find a good deal");
 
+        // test filter deals with known deals
         let usd_deal_a = Deal::new(200.0, 330.0, GoodKind::USD, "market_a".to_string());
         let usd_deal_b = Deal::new(500.0, 550.0, GoodKind::USD, "market_b".to_string());
-        let usd_deal_c = Deal::new(300.0, 670.0, GoodKind::USD, "market_c".to_string());
+        let usd_deal_c = Deal::new(300.0, 670.0, GoodKind::YUAN, "market_c".to_string());
         let usd_deal_d = Deal::new(400.0, 430.0, GoodKind::USD, "market_d".to_string());
         let yen_deal_a = Deal::new(150.0, 750.0, GoodKind::YEN, "market_a".to_string());
 
-        let strategy = StingyStrategy::new(Vec::new(), trader_name);
+        let strategy = StingyStrategy::new(vec![], trader_name);
 
         let deals = vec![usd_deal_a, usd_deal_b, usd_deal_c, usd_deal_d, yen_deal_a];
         let deal = strategy.filter_deals(deals);
-        assert!(deal.is_some(), "There should be a deal");
-        assert_eq!(deal.unwrap().price, 150.0);
+        assert!(deal.is_some(), "The strategy should find a good deal");
+        assert_eq!(deal.unwrap().price, 150.0, "The best price should be 150.0 EUR");
     }
 
     #[test]
     fn test_lock_deal() {
+        // test lock deal with a valid token
         let trader_name = TRADER_NAME_STINGY;
         let sgx = init_sgx(0.0, 100_000.0, 500.0, 1000.0);
         let markets = vec![Rc::clone(&sgx)];
 
         let strategy = StingyStrategy::new(markets, trader_name);
 
-        let deals = strategy.find_deals(100_000.0, 0.05);
+        let deals = strategy.find_deals(10_000.0, 0.01);
         let deal = strategy.filter_deals(deals);
         if let Some(deal) = deal {
             let token = strategy.lock_deal(&deal);
-            assert!(
-                token.is_some(),
-                "There should be a token {}",
-                token.unwrap()
-            );
+            assert!(token.is_some(), "The strategy should get a valid token");
         }
-    }
 
-    #[test]
-    fn test_lock_deal_with_no_deal() {
-        let trader_name = TRADER_NAME_STINGY;
+        // test lock deal with no valid token
         let sgx = init_sgx(0.0, 1.0, 1.0, 1.0);
-        let markets = vec![sgx];
+        let strategy = StingyStrategy::new(vec![Rc::clone(&sgx)], trader_name);
 
-        let strategy = StingyStrategy::new(markets, trader_name);
-
-        let deals = strategy.find_deals(100_000.0, 0.05);
+        let deals = strategy.find_deals(10_000.0, 0.01);
         let deal = strategy.filter_deals(deals);
         if let Some(deal) = deal {
             let token = strategy.lock_deal(&deal);
@@ -794,8 +777,55 @@ mod tests {
     }
 
     #[test]
-    fn test_find_and_filter_deals_for_sell() {
+    fn test_find_deals_for_sell() {
         let trader_name = TRADER_NAME_STINGY;
+
+        // test find deals for sell with a good deal
+        let sgx = init_sgx(50.0, 50.0, 5_000.0, 1_000.0);
+        let smse = init_smse(10.0, 1.0, 1.0, 0.0);
+        let zse = init_zse(11.0, 1.0, 1_000.0, 1.0);
+
+        let markets = vec![
+            Rc::clone(&sgx),
+            Rc::clone(&smse),
+            Rc::clone(&zse)
+        ];
+
+        let strategy = StingyStrategy::new(markets, trader_name);
+
+        let good_yen = Good::new(GoodKind::YEN, 50.0);
+        let good_usd = Good::new(GoodKind::USD, 90.0);
+        let good_yuan = Good::new(GoodKind::YUAN, 100.0);
+
+        let deals = strategy.find_deal_for_sell(&[good_yen, good_usd, good_yuan], 0.05);
+        assert!(!deals.is_empty(), "The strategy should find a good deal for sell");
+
+        // test find deals for sell with no deal
+        let sgx = init_sgx(0.0, 0.0, 0.0, 0.0);
+        let smse = init_smse(0.0, 0.0, 0.0, 0.0);
+        let tase = init_tase(0.0, 0.0, 0.0, 0.0);
+
+        let markets = vec![
+            Rc::clone(&sgx),
+            Rc::clone(&smse),
+            Rc::clone(&tase)
+        ];
+
+        let strategy = StingyStrategy::new(markets, trader_name);
+
+        let good_yen = Good::new(GoodKind::YEN, 1_000.0);
+        let good_usd = Good::new(GoodKind::USD, 100.0);
+        let good_yuan = Good::new(GoodKind::YUAN, 50.0);
+
+        let deals = strategy.find_deal_for_sell(&[good_yen, good_usd, good_yuan], 0.05);
+        assert!(deals.is_empty(), "The strategy should not find a good deal for sell");
+    }
+
+    #[test]
+    fn test_filter_deals_for_sell() {
+        let trader_name = TRADER_NAME_STINGY;
+
+        // test filter deals for sell with a good deal
         let sgx = init_sgx(50.0, 50.0, 5_000.0, 1_000.0);
         let smse = init_smse(10.0, 1.0, 1.0, 0.0);
         let zse = init_zse(11.0, 1.0, 1_000.0, 1.0);
@@ -808,20 +838,14 @@ mod tests {
         let good_usd = Good::new(GoodKind::USD, 90.0);
         let good_yuan = Good::new(GoodKind::YUAN, 100.0);
 
-        let deals = strategy.find_deal_for_sell(&vec![good_yen, good_usd, good_yuan], 0.05);
-        assert!(deals.len() > 0, "Should be found a good deal for sell");
-
+        let deals = strategy.find_deal_for_sell(&[good_yen, good_usd, good_yuan], 0.05);
         let deal = strategy.filter_deals(deals);
-        assert!(deal.is_some(), "Should be found the best deal");
-    }
+        assert!(deal.is_some(), "The strategy should find a good deal to sell");
 
-    #[test]
-    fn test_find_and_filter_deals_for_sell_with_no_deals() {
-        let trader_name = TRADER_NAME_STINGY;
+        // test filter deals for sell with no deal
         let sgx = init_sgx(0.0, 0.0, 0.0, 0.0);
         let smse = init_smse(0.0, 0.0, 0.0, 0.0);
         let tase = init_tase(0.0, 0.0, 0.0, 0.0);
-        // let zse = init_zse(0.0, 0.0, 0.0, 0.0);
 
         let markets = vec![Rc::clone(&sgx), Rc::clone(&smse), Rc::clone(&tase)];
 
@@ -831,16 +855,16 @@ mod tests {
         let good_usd = Good::new(GoodKind::USD, 100.0);
         let good_yuan = Good::new(GoodKind::YUAN, 50.0);
 
-        let deals = strategy.find_deal_for_sell(&vec![good_yen, good_usd, good_yuan], 0.05);
-        assert_eq!(deals.len(), 0);
-
+        let deals = strategy.find_deal_for_sell(&[good_yen, good_usd, good_yuan], 0.05);
         let deal = strategy.filter_deals(deals);
-        assert!(deal.is_none(), "Should not be found the best deal");
+        assert!(deal.is_none(), "The strategy should not find a good deal to sell");
     }
 
     #[test]
     fn test_lock_deal_for_sell() {
         let trader_name = TRADER_NAME_STINGY;
+
+        // test lock deal for sell with a valid token
         let sgx = init_sgx(50.0, 50.0, 5_000.0, 1_000.0);
         let smse = init_smse(10.0, 1.0, 1.0, 0.0);
         let zse = init_zse(11.0, 1.0, 1_000.0, 1.0);
@@ -857,7 +881,142 @@ mod tests {
         let deal = strategy.filter_deals(deals);
         if let Some(deal) = deal {
             let token = strategy.lock_deal_for_sell(&deal);
-            assert!(token.is_some());
+            assert!(token.is_some(), "The strategy should get a valid token");
         }
+
+        // test lock deal for sell with no valid token
+        let sgx = init_sgx(1.0, 0.0, 1.0, 1.0);
+        let smse = init_smse(0.0, 1.0, 1.0, 0.0);
+        let zse = init_zse(1.0, 1.0, 0.0, 0.0);
+
+        let markets = vec![Rc::clone(&sgx), Rc::clone(&smse), Rc::clone(&zse)];
+
+        let strategy = StingyStrategy::new(markets, trader_name);
+
+        let good_yen = Good::new(GoodKind::YEN, 50.0);
+        let good_usd = Good::new(GoodKind::USD, 90.0);
+        let good_yuan = Good::new(GoodKind::YUAN, 100.0);
+
+        let deals = strategy.find_deal_for_sell(&vec![good_yen, good_usd, good_yuan], 0.05);
+        let deal = strategy.filter_deals(deals);
+        if let Some(deal) = deal {
+            let token = strategy.lock_deal_for_sell(&deal);
+            assert!(token.is_none(), "The strategy should not get a valid token");
+        }
+    }
+
+    #[test]
+    fn test_get_market_quantity() {
+        let trader_name = TRADER_NAME_STINGY;
+        let sgx = init_sgx(0.0, 0.0, 0.0, 0.0);
+        let smse = init_smse(0.0, 0.0, 0.0, 0.0);
+        let tase = init_tase(0.0, 0.0, 0.0, 0.0);
+        let zse = init_zse(0.0, 0.0, 0.0, 0.0);
+
+        let markets = vec![
+          Rc::clone(&sgx),
+          Rc::clone(&smse),
+          Rc::clone(&tase),
+          Rc::clone(&zse),
+        ];
+        let strategy = StingyStrategy::new(markets, trader_name);
+        let markets_qty = strategy.get_market_qty();
+        assert_eq!(markets_qty, 4, "There should be 4 markets");
+
+        let markets = vec![];
+        let strategy = StingyStrategy::new(markets, trader_name);
+        let markets_qty = strategy.get_market_qty();
+        assert_eq!(markets_qty, 0, "There should be 0 markets");
+
+        let markets = vec![Rc::clone(&sgx)];
+        let strategy = StingyStrategy::new(markets, trader_name);
+        let markets_qty = strategy.get_market_qty();
+        assert_eq!(markets_qty, 1, "There should be 1 markets");
+    }
+
+    #[test]
+    fn test_update_ex_rates_buy() {
+        let trader_name = TRADER_NAME_STINGY;
+        let sgx = init_sgx(0.0, 20.0, 0.0, 0.0);
+        let smse = init_smse(0.0, 0.0, 1_000.0, 0.0);
+        let tase = init_tase(0.0, 50.0, 10_000.0, 0.0);
+        let zse = init_zse(0.0, 100.0, 100.0, 0.0);
+
+        let markets = vec![
+            Rc::clone(&sgx),
+            Rc::clone(&zse),
+            Rc::clone(&smse),
+            Rc::clone(&tase)
+        ];
+
+        // test update_ex_rate_buy with ex_rate_buy_history empty
+        let strategy = StingyStrategy::new(markets, trader_name);
+        let ex_rate = strategy.get_avg_buy_ex_rate(GoodKind::USD);
+        assert_eq!(ex_rate, 0.0, "The average exchange rate (buy) for USD should be 0.0");
+
+        strategy.update_ex_rates_buy();
+
+        // test update_ex_rate_buy with updated ex_rate_buy_history
+        let ex_rate = strategy.get_avg_buy_ex_rate(GoodKind::USD);
+        assert!(ex_rate > 0.0, "The average exchange rate (buy) for USG should be greater than 0.0");
+    }
+
+    #[test]
+    fn test_update_ex_rates_sell() {
+        let trader_name = TRADER_NAME_STINGY;
+        let sgx = init_sgx(0.0, 20.0, 0.0, 0.0);
+        let smse = init_smse(0.0, 0.0, 1_000.0, 0.0);
+        let tase = init_tase(0.0, 50.0, 10_000.0, 0.0);
+        let zse = init_zse(0.0, 100.0, 100.0, 0.0);
+
+        let markets = vec![
+            Rc::clone(&sgx),
+            Rc::clone(&zse),
+            Rc::clone(&smse),
+            Rc::clone(&tase)
+        ];
+
+        // test update_ex_rate_sell with ex_rate_sell_history empty
+        let strategy = StingyStrategy::new(markets, trader_name);
+        let ex_rate = strategy.get_avg_sell_ex_rate(GoodKind::USD);
+        assert_eq!(ex_rate, 0.0, "The average exchange rate (sell) for USD should be 0.0");
+
+        strategy.update_ex_rates_sell();
+
+        // test update_ex_rate_sell with updated ex_rate_sell_history
+        let ex_rate = strategy.get_avg_sell_ex_rate(GoodKind::USD);
+        assert!(ex_rate > 0.0, "The average exchange rate (sell) for USG should be greater than 0.0");
+    }
+
+    #[test]
+    fn add_ex_rate_buy_to_history() {
+        let trader_name = TRADER_NAME_STINGY;
+
+        let exchange_rate = ExchangeRate::new(0.9, GoodKind::USD);
+        let strategy = StingyStrategy::new(vec![], trader_name);
+
+        // test add_ex_rate_buy_to_history with an empty vec
+        assert!(strategy.ex_rate_buy_history.borrow().is_empty(), "Ex rate buy history vec should be empty");
+
+        strategy.add_ex_rate_buy_to_history(exchange_rate);
+
+        // test add_ex_rate_buy_to_history with an updated vec
+        assert!(!strategy.ex_rate_buy_history.borrow().is_empty(), "Ex rate buy history vec should not be empty");
+    }
+
+    #[test]
+    fn add_ex_rate_sell_to_history() {
+        let trader_name = TRADER_NAME_STINGY;
+
+        let exchange_rate = ExchangeRate::new(0.9, GoodKind::USD);
+        let strategy = StingyStrategy::new(vec![], trader_name);
+
+        // test add_ex_rate_sell_to_history with an empty vec
+        assert!(strategy.ex_rate_sell_history.borrow().is_empty(), "Ex rate sell history vec should be empty");
+
+        strategy.add_ex_rate_sell_to_history(exchange_rate);
+
+        // test add_ex_rate_sell_to_history with an updated vec
+        assert!(!strategy.ex_rate_sell_history.borrow().is_empty(), "Ex rate sell history vec should not be empty");
     }
 }
