@@ -629,7 +629,7 @@ impl AverageSellerStrategy {
                 );
                 // add (remove) from history
                 self.add_to_buy_history(
-                    &Good::new(offer.good_kind, new_quantity * (-1.0)), // TODO Check this
+                    &Good::new(offer.good_kind, new_quantity * (-1.0)),
                     cash.get_qty() * (-1.0),
                 );
                 // Now increase our eur quantity
@@ -770,7 +770,6 @@ impl Strategy for AverageSellerStrategy {
                     market_name,
                 ))
             } else {
-                // todo: OfferTooHight -> Just return the highest acceptable offer
                 None
             }
         });

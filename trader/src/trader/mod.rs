@@ -131,7 +131,7 @@ impl Trader {
         let _ = env_logger::try_init_from_env(env);
 
         // init default goods
-        let name = Self::get_name_for_strategy(StrategyIdentifier::AverageSeller);
+        let name = Self::get_name_for_strategy(strategy_id.clone());
         let strategy = Self::init_strategy(strategy_id, markets, name);
         let goods = Self::create_goods(start_capital);
         let history = Vec::from([Self::transform_good_to_history_day(0, &goods)]);
