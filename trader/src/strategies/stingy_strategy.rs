@@ -1006,8 +1006,12 @@ mod tests {
     fn add_ex_rate_buy_to_history() {
         let trader_name = TRADER_NAME_STINGY;
 
+        let smse = init_smse(0.0, 1.0, 1.0, 0.0);
+        let tase = init_tase(0.0, 10.0, 10.0, 10.0);
+        let markets = vec![Rc::clone(&smse), Rc::clone((&tase))];
+
         let exchange_rate = ExchangeRate::new(0.9, GoodKind::USD);
-        let strategy = StingyStrategy::new(vec![], trader_name);
+        let strategy = StingyStrategy::new(markets, trader_name);
 
         // test add_ex_rate_buy_to_history with an empty vec
         assert!(
@@ -1028,8 +1032,12 @@ mod tests {
     fn add_ex_rate_sell_to_history() {
         let trader_name = TRADER_NAME_STINGY;
 
+        let smse = init_smse(0.0, 1.0, 1.0, 0.0);
+        let tase = init_tase(0.0, 10.0, 10.0, 10.0);
+        let markets = vec![Rc::clone(&smse), Rc::clone((&tase))];
+
         let exchange_rate = ExchangeRate::new(0.9, GoodKind::USD);
-        let strategy = StingyStrategy::new(vec![], trader_name);
+        let strategy = StingyStrategy::new(markets, trader_name);
 
         // test add_ex_rate_sell_to_history with an empty vec
         assert!(
