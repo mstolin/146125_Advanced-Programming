@@ -458,7 +458,7 @@ mod tests {
             //Rc::clone(&zse), // Total "out-of-the-world" offers
         ];
 
-        let trader = Trader::from(StrategyIdentifier::Stingy, 1_000_000.0, markets);
+        let trader = Trader::from(StrategyIdentifier::Stingy, 1000.0, markets);
 
         assert_eq!(0, trader.get_days(), "Trader should not have started now");
         trader.apply_strategy(days, 60);
