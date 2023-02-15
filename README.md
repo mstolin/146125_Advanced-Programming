@@ -9,6 +9,6 @@ each module contains its own readme.
 
 | Name              | Github                                      | Modules                                          |
 |-------------------|---------------------------------------------|--------------------------------------------------|
-| Farid Ouedraogo   | [Farid0U](https://github.com/Farid0U)       | SGX, visualizer                                  |
 | Sebastiano Cassol | [cassolseba](https://github.com/cassolseba) | SGX, stingy-strategy                             |
+| Farid Ouedraogo   | [Farid0U](https://github.com/Farid0U)       | SGX, visualizer                                  |
 | Marcel Stolin     | [mstolin](https://github.com/mstolin)       | SGX, trader, trader-cli, average-seller-strategy |

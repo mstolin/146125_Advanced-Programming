@@ -2,7 +2,7 @@
 name = "trader"
 version = "0.1.0"
 edition = "2021"
-authors = ["Farid Ouedraogo, Marcel Stolin, Sebastiano Cassol, Jacopo Clocchiatti"]
+authors = ["Farid Ouedraogo, Marcel Stolin, Sebastiano Cassol"]
 
 [dependencies]
 env_logger = "0.10.0"
