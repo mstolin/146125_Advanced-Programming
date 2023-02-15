@@ -1,0 +1,11 @@
+[package]
+name = "SGX"
+version = "0.1.6"
+edition = "2021"
+authors = ["Farid Ouedraogo, Marcel Stolin, Sebastiano Cassol"]
+publish = ["kellnr"]
+
+[dependencies]
+unitn_market_2022 = {version = "1.0.10", registry = "kellnr"}
+rand = "0.8.5"
+chrono = "0.4.23"
