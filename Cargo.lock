@@ -5,6 +5,15 @@ version = 3
 [[package]]
 name = "SGX"
 version = "0.1.6"
+dependencies = [
+ "chrono",
+ "rand",
+ "unitn_market_2022",
+]
+
+[[package]]
+name = "SGX"
+version = "0.1.6"
 source = "registry+git://advancedprogramming.disi.unitn.it/index"
 checksum = "cec75bb839c0e70479dafaba4a42a8665a7db03993ab60cd1ed760dd8dfbe478"
 dependencies = [
@@ -2212,7 +2221,7 @@ dependencies = [
 name = "trader"
 version = "0.1.0"
 dependencies = [
- "SGX",
+ "SGX 0.1.6 (registry+git://advancedprogramming.disi.unitn.it/index)",
  "TASE",
  "ZSE",
  "env_logger",
@@ -2228,7 +2237,7 @@ dependencies = [
 name = "trader-cli"
 version = "0.1.0"
 dependencies = [
- "SGX",
+ "SGX 0.1.6 (registry+git://advancedprogramming.disi.unitn.it/index)",
  "TASE",
  "ZSE",
  "chrono",

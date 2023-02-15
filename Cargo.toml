@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "SGX",
     "trader-cli",
     "trader",
     "visualizer",
